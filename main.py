@@ -9,12 +9,12 @@ from prompt import build_prompt
 app = FastAPI()
 
 # -------- Env setup --------
-client                  = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-SUPABASE_URL            = os.getenv("SUPABASE_URL")
-SUPABASE_KEY            = os.getenv("SUPABASE_KEY")
-SUPABASE_JWT_SECRET     = os.getenv("SUPABASE_JWT_SECRET")
-VIBER_TOKEN             = os.getenv("VIBER_TOKEN")
-supabase: Client        = create_client(SUPABASE_URL, SUPABASE_KEY)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+VIBER_TOKEN = os.getenv("VIBER_TOKEN")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -------- Static admin panel --------
 if os.path.exists("admin"):
@@ -31,15 +31,18 @@ async def login_user(email: str = Body(...), password: str = Body(...)):
             raise HTTPException(status_code=404, detail="User not found")
         user = res.data
 
+        if not user["password"].startswith("$2b$"):
+            raise HTTPException(status_code=400, detail="Password hash format invalid")
+
         if not bcrypt.checkpw(password.encode(), user["password"].encode()):
             raise HTTPException(status_code=401, detail="Invalid password")
 
         payload = {
-            "sub":  user["id"],
+            "sub": user["id"],
             "email": user["email"],
             "role": user.get("role", "user"),
-            "exp":  datetime.datetime.utcnow() + datetime.timedelta(days=1),
-            "aud":  "authenticated",
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1),
+            "aud": "authenticated",
         }
         token = jwt.encode(payload, SUPABASE_JWT_SECRET, algorithm="HS256")
         return {"access_token": token}
@@ -127,8 +130,8 @@ async def viber_webhook(req: Request):
         body = await req.json()
         print("[DEBUG] Viber payload:", body)
 
-        event        = body.get("event")
-        sender_id    = body.get("sender", {}).get("id", "")
+        event = body.get("event")
+        sender_id = body.get("sender", {}).get("id", "")
         message_text = body.get("message", {}).get("text", "")
 
         if get_maintenance_setting():
@@ -146,9 +149,9 @@ async def viber_webhook(req: Request):
                 )
             return {"status": 0}
 
-        if event == "message":
-            prompt     = build_prompt(message_text)
-            gpt_reply  = client.chat.completions.create(
+        if event == "message" and len(message_text) < 1000:
+            prompt = build_prompt(message_text)
+            gpt_reply = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
             ).choices[0].message.content
@@ -172,6 +175,5 @@ async def viber_webhook(req: Request):
 
 # --------------- Entrypoint ---------------
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
-
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
