@@ -3,79 +3,268 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>YGN Real Estate Admin Panel</title>
+  <title>YGN Real Estate Admin Panel (Login Required)</title>
   <style>
+    /* Reset and base styles */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: #f4f7f9;
-      margin: 0; padding: 20px;
-      color: #333;
+      background: linear-gradient(135deg, #f0f4f8, #d9e2ec);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #222;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    header {
-      background-color: #004aad;
-      color: white;
-      padding: 1rem 2rem;
-      border-radius: 8px;
-      margin-bottom: 20px;
+    #app {
+      width: 100%;
+      max-width: 480px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgb(0 0 0 / 0.1);
+      padding: 2.5rem 2.5rem 3rem;
+      box-sizing: border-box;
       text-align: center;
+      user-select: none;
     }
     h1 {
-      margin: 0;
+      color: #1e40af;
+      margin-bottom: 2rem;
+      font-weight: 700;
+      font-size: 2.2rem;
+      letter-spacing: 0.04em;
+      user-select: none;
+    }
+    input[type="email"],
+    input[type="password"],
+    textarea {
+      width: 100%;
+      padding: 14px 18px;
+      margin: 0.6rem 0 1.4rem;
+      font-size: 1.05rem;
+      border-radius: 10px;
+      border: 2px solid #cbd5e1;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      font-family: inherit;
+      resize: vertical;
+    }
+    input[type="email"]:focus,
+    input[type="password"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 12px #93c5fdaa;
+      background-color: #fefeff;
+    }
+    button {
+      width: 100%;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 15px rgb(37 99 235 / 0.4);
+      transition: background-color 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
+      user-select: none;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    button:hover:not(:disabled) {
+      background-color: #1e40af;
+      box-shadow: 0 10px 25px rgb(30 64 175 / 0.6);
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      background-color: #9ca3af;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+    #status, #saveStatus {
+      margin-top: 1rem;
+      font-style: italic;
+      font-size: 0.95rem;
+      min-height: 24px;
+      user-select: text;
+      color: #444;
+      transition: color 0.3s ease;
+      word-break: break-word;
+    }
+    #status.error, #saveStatus.error {
+      color: #dc2626;
       font-weight: 600;
     }
-    main {
-      background: white;
-      padding: 2rem;
+    #status.success, #saveStatus.success {
+      color: #16a34a;
+      font-weight: 600;
+    }
+    #logoutBtn {
+      margin-top: 1.8rem;
+      background-color: #ef4444;
       border-radius: 10px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
-      max-width: 800px;
-      margin: 0 auto;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgb(239 68 68 / 0.65);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
+      user-select: none;
+      display: inline-block;
     }
-    section {
-      margin-bottom: 20px;
+    #logoutBtn:hover {
+      background-color: #b91c1c;
+      box-shadow: 0 8px 24px rgb(185 28 28 / 0.8);
+      transform: translateY(-1px);
     }
-    .info {
-      background: #e0f0ff;
-      border-left: 4px solid #004aad;
-      padding: 1rem;
-      border-radius: 5px;
-      font-size: 1.1rem;
+    #adminPanel {
+      display: none;
+      text-align: left;
+      user-select: text;
+    }
+    section.card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 2rem 2rem 2.2rem;
+      box-shadow: 0 8px 20px rgb(0 0 0 / 0.07);
+      margin-bottom: 28px;
+      transition: box-shadow 0.3s ease;
+    }
+    section.card:hover {
+      box-shadow: 0 14px 38px rgb(0 0 0 / 0.12);
+    }
+    section.card h2 {
+      margin-top: 0;
+      font-weight: 700;
+      font-size: 1.5rem;
+      color: #1e40af;
+      margin-bottom: 1.2rem;
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 0.35rem;
+      letter-spacing: 0.04em;
+      user-select: text;
+    }
+    label {
+      font-weight: 600;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: 1.2rem;
+      gap: 0.8rem;
+      color: #1e40af;
+      user-select: none;
+    }
+    input[type="checkbox"] {
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      accent-color: #2563eb;
+      border-radius: 6px;
+      box-shadow: 0 0 4px rgb(0 0 0 / 0.1);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      flex-shrink: 0;
+    }
+    textarea {
+      min-height: 130px;
+      font-family: inherit;
     }
     footer {
       text-align: center;
-      color: #888;
+      color: #6b7280;
       font-size: 0.9rem;
-      margin-top: 40px;
+      margin-top: 3rem;
+      user-select: none;
+      font-style: italic;
+    }
+
+    /* Responsive */
+    @media (max-width: 520px) {
+      #app {
+        padding: 2rem 1.5rem 2.5rem;
+      }
+      section.card {
+        padding: 1.8rem 1.8rem 2rem;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
+  <main id="app" role="main" aria-label="YGN Real Estate Admin Panel">
     <h1>YGN Real Estate Admin Panel</h1>
-  </header>
-  <main>
-    <section class="info">
-      <p>Welcome to the admin dashboard. Here you can monitor users, payments, and listings.</p>
-      <p>ဒီနေရာမှာ သုံးစွဲသူများ၊ ငွေပေးချေမှုများနှင့် စာရင်းများကို စစ်ဆေးနိုင်ပါတယ်။</p>
+
+    <section id="authSection" aria-live="polite" aria-relevant="additions">
+      <input type="email" id="email" placeholder="Email address" autocomplete="username" aria-label="Email address" />
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password" aria-label="Password" />
+      <button id="loginBtn" aria-describedby="status" aria-live="polite">Log In</button>
+      <div id="status" role="alert" aria-live="assertive"></div>
     </section>
 
-    <section>
-      <h2>User Management (coming soon)</h2>
-      <p>Manage users who have accessed the chatbot service.</p>
+    <section id="adminPanel" aria-live="polite" aria-relevant="additions" tabindex="-1">
+      <section class="card" aria-labelledby="maintenanceHeading">
+        <h2 id="maintenanceHeading">Maintenance Mode</h2>
+        <label for="maintenanceToggle">
+          <input type="checkbox" id="maintenanceToggle" aria-checked="false" />
+          Enable Maintenance Mode
+        </label>
+        <label for="maintenanceMessage">Maintenance Message:</label>
+        <textarea id="maintenanceMessage" placeholder="Enter maintenance message here...">Server maintenance. Please try again later.</textarea>
+        <button id="saveSettingsBtn" aria-describedby="saveStatus">Save Settings</button>
+        <div id="saveStatus" role="alert" aria-live="assertive"></div>
+        <button id="logoutBtn">Log Out</button>
+      </section>
+
+      <section class="card" aria-label="User Management (coming soon)">
+        <h2>User Management (coming soon)</h2>
+        <p>Manage users who have accessed the chatbot service.</p>
+      </section>
+
+      <section class="card" aria-label="Payment Records (coming soon)">
+        <h2>Payment Records (coming soon)</h2>
+        <p>Track all payments received via Kpay or WavePay.</p>
+      </section>
+
+      <section class="card" aria-label="Real Estate Listings (coming soon)">
+        <h2>Real Estate Listings (coming soon)</h2>
+        <p>View and manage property listings in Yangon.</p>
+      </section>
     </section>
 
-    <section>
-      <h2>Payment Records (coming soon)</h2>
-      <p>Track all payments received via Kpay or WavePay.</p>
-    </section>
-
-    <section>
-      <h2>Real Estate Listings (coming soon)</h2>
-      <p>View and manage property listings in Yangon.</p>
-    </section>
+    <footer>
+      © 2025 YGN Real Estate Bot - Made with ❤️ by Ethan
+    </footer>
   </main>
-  <footer>
-    © 2025 YGN Real Estate Bot - Made with ❤️ by Ethan
-  </footer>
-</body>
-</html>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = "https://kpmwchafjuwmcilrnyhy.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwbXdjaGFmanV3bWNpbHJueWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk4MzIxOTUsImV4cCI6MjA2NTQwODE5NX0.B_2ZCQWvsczVKx-AK1XCDHbalm79gz_r6iFrwQK303g";
+
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const authSection = document.getElementById('authSection');
+    const adminPanel = document.getElementById('adminPanel');
+    const statusDiv = document.getElementById('status');
+    const saveStatusDiv = document.getElementById('saveStatus');
+
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    const maintenanceToggle = document.getElementById('maintenanceToggle');
+    const maintenanceMessage = document.getElementById('maintenanceMessage');
+    const saveBtn = document.getElementById('saveSettingsBtn');
+
+    // Focus management helper
+    function focusElement(el) {
+      if (el) el.focus();
