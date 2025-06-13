@@ -1,45 +1,71 @@
-from fastapi import FastAPI, Request, HTTPException, Depends, Header
+from fastapi import FastAPI, Request, HTTPException, Depends, Header, Body
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import os
 import requests
-from openai import OpenAI
+import jwt
+import bcrypt
+import datetime
 from supabase import create_client, Client
+from openai import OpenAI
 from prompt import build_prompt
-import jwt  # PyJWT library, install with: pip install PyJWT
 
 app = FastAPI()
 
+# Env setup
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 VIBER_TOKEN = os.getenv("VIBER_TOKEN")
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")  # Supabase JWT secret for token verification
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Mount admin panel static folder with token verification middleware
+# Mount admin panel
 if os.path.exists("admin"):
     app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
 else:
     print("[WARN] 'admin' directory does not exist; admin panel not mounted.")
 
+# ---------------------- Auth Section ---------------------- #
+
+@app.post("/auth/login")
+async def login_user(email: str = Body(...), password: str = Body(...)):
+    try:
+        user_result = supabase.table("users").select("*").eq("email", email).single().execute()
+        user = user_result.data
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        hashed_pw = user["password"]
+        if not bcrypt.checkpw(password.encode(), hashed_pw.encode()):
+            raise HTTPException(status_code=401, detail="Invalid password")
+
+        payload = {
+            "sub": user["id"],
+            "email": user["email"],
+            "role": user.get("role", "user"),
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(days=1),
+            "aud": "authenticated"
+        }
+
+        token = jwt.encode(payload, SUPABASE_JWT_SECRET, algorithm="HS256")
+        return {"access_token": token}
+    except Exception as e:
+        print(f"[ERROR] Login error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 def verify_jwt_token(auth_header: str = Header(...)):
-    """
-    Extract and verify JWT token from Authorization header,
-    check if user role is admin, else raise HTTPException.
-    """
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header format")
-    token = auth_header.split(" ")[1]
 
+    token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
-            audience="authenticated",  # Usually "authenticated" for Supabase tokens
+            audience="authenticated",
             options={"verify_exp": True},
         )
     except jwt.ExpiredSignatureError:
@@ -47,66 +73,81 @@ def verify_jwt_token(auth_header: str = Header(...)):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Role check (assuming `role` is included in JWT payload)
-    role = payload.get("role")
-    if role != "admin":
+    if payload.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
     return payload
 
+# ---------------------- Admin Panel ---------------------- #
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    content = """
+    return """
     <html><head><title>YGN Real Estate Bot</title></head><body>
     <h1>Welcome to YGN Real Estate Bot Backend</h1>
-    <p>Visit <a href="/admin">/admin</a> for the Admin Panel (if available)</p>
+    <p>Visit <a href="/admin">/admin</a> for the Admin Panel</p>
     </body></html>
     """
-    return HTMLResponse(content=content)
 
+@app.get("/admin/users")
+async def list_users(payload=Depends(verify_jwt_token)):
+    return {
+        "users": [
+            {"id": "user1", "name": "Admin အကိုကြီး", "access_level": "basic"},
+            {"id": "user2", "name": "Admin ညီမလေး", "access_level": "admin"},
+        ]
+    }
+
+@app.get("/payments/summary")
+async def payments_summary(payload=Depends(verify_jwt_token)):
+    return {
+        "total_payments": 25,
+        "total_amount": 1250000,
+        "currency": "MMK",
+    }
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+# ---------------------- Maintenance System ---------------------- #
 
 def get_maintenance_setting():
     try:
-        response = supabase.table("settings").select("*").eq("key", "maintenance_mode").single().execute()
-        maintenance_mode = False
-        if response.data:
-            maintenance_mode = response.data.get("value") == "true"
+        res = supabase.table("settings").select("*").eq("key", "maintenance_mode").single().execute()
+        return res.data and res.data.get("value") == "true"
     except Exception as e:
-        print(f"[ERROR] Failed to fetch maintenance_mode setting: {e}")
-        maintenance_mode = False
-    return maintenance_mode
-
+        print(f"[ERROR] maintenance_mode: {e}")
+        return False
 
 def get_maintenance_message():
     try:
-        response = supabase.table("settings").select("*").eq("key", "maintenance_message").single().execute()
-        if response.data and response.data.get("value"):
-            return response.data.get("value")
+        res = supabase.table("settings").select("*").eq("key", "maintenance_message").single().execute()
+        return res.data.get("value") if res.data else "Server maintenance. Please try again later."
     except Exception as e:
-        print(f"[ERROR] Failed to fetch maintenance_message setting: {e}")
-    return "Server maintenance. Please try again later."
+        print(f"[ERROR] maintenance_message: {e}")
+        return "Server maintenance. Please try again later."
 
+# ---------------------- Viber Webhook ---------------------- #
 
 @app.get("/viber-webhook")
-async def viber_webhook_get():
-    return {"status": "ok", "message": "Viber webhook endpoint is live"}
-
+async def webhook_check():
+    return {"status": "ok", "message": "Viber webhook live"}
 
 @app.post("/viber-webhook")
-async def viber_webhook_post(req: Request):
+async def viber_webhook(req: Request):
     try:
         body = await req.json()
-        print("[DEBUG] Incoming webhook payload:", body)
+        print("[DEBUG] Viber payload:", body)
+
         event = body.get("event")
+        sender_id = body.get("sender", {}).get("id", "")
+        message_text = body.get("message", {}).get("text", "")
 
-        maintenance_mode = get_maintenance_setting()
-        if maintenance_mode:
+        if get_maintenance_setting():
             if event == "message":
-                sender_id = body["sender"]["id"]
                 maintenance_msg = get_maintenance_message()
-
-                resp = requests.post(
+                requests.post(
                     "https://chatapi.viber.com/pa/send_message",
                     json={
                         "receiver": sender_id,
@@ -117,65 +158,32 @@ async def viber_webhook_post(req: Request):
                     },
                     headers={"X-Viber-Auth-Token": VIBER_TOKEN},
                 )
-                print(f"[INFO] Maintenance reply sent with status {resp.status_code}")
-                return {"status": 0}
             return {"status": 0}
 
         if event == "message":
-            sender_id = body["sender"]["id"]
-            message_text = body["message"]["text"]
-            print(f"[INFO] Message from {sender_id}: {message_text}")
-
             prompt = build_prompt(message_text)
-
-            response = client.chat.completions.create(
+            gpt_reply = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
-            )
-            reply = response.choices[0].message.content
-            print(f"[INFO] GPT reply: {reply}")
+            ).choices[0].message.content
 
-            resp = requests.post(
+            print(f"[INFO] GPT reply: {gpt_reply}")
+
+            requests.post(
                 "https://chatapi.viber.com/pa/send_message",
                 json={
                     "receiver": sender_id,
                     "min_api_version": 1,
                     "sender": {"name": "YGN Real Estate Bot"},
                     "type": "text",
-                    "text": reply,
+                    "text": gpt_reply,
                 },
                 headers={"X-Viber-Auth-Token": VIBER_TOKEN},
             )
-            print(f"[INFO] Viber send_message response status: {resp.status_code}, body: {resp.text}")
 
         return {"status": 0}
 
     except Exception as e:
-        print(f"[ERROR] Exception in /viber-webhook: {e}")
+        print(f"[ERROR] Viber webhook error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-
-# Protect admin-only API route example
-@app.get("/admin/users")
-async def admin_list_users(payload=Depends(verify_jwt_token)):
-    # This API only accessible if valid admin JWT token provided
-    users = [
-        {"id": "user1", "name": "Admin အကိုကြီး", "access_level": "basic"},
-        {"id": "user2", "name": "Admin ညီမလေး", "access_level": "admin"},
-    ]
-    return {"users": users}
-
-
-@app.get("/payments/summary")
-async def payments_summary(payload=Depends(verify_jwt_token)):
-    summary = {
-        "total_payments": 25,
-        "total_amount": 1250000,
-        "currency": "MMK",
-    }
-    return summary
-
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy"}
