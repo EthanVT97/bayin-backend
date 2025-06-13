@@ -32,7 +32,8 @@ else:
 @app.post("/auth/login")
 async def login_user(email: str = Body(...), password: str = Body(...)):
     try:
-        user_result = supabase.table("users").select("*").eq("email", email).single().execute()
+        # use maybe_single() to avoid JSON object multiple rows error or no row error
+        user_result = supabase.table("users").select("*").eq("email", email).maybe_single().execute()
         user = user_result.data
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -91,6 +92,7 @@ async def root():
 
 @app.get("/admin/users")
 async def list_users(payload=Depends(verify_jwt_token)):
+    # Sample static users data, replace with real DB fetch if needed
     return {
         "users": [
             {"id": "user1", "name": "Admin အကိုကြီး", "access_level": "basic"},
@@ -114,7 +116,7 @@ async def health():
 
 def get_maintenance_setting():
     try:
-        res = supabase.table("settings").select("*").eq("key", "maintenance_mode").single().execute()
+        res = supabase.table("settings").select("*").eq("key", "maintenance_mode").maybe_single().execute()
         return res.data and res.data.get("value") == "true"
     except Exception as e:
         print(f"[ERROR] maintenance_mode: {e}")
@@ -122,7 +124,7 @@ def get_maintenance_setting():
 
 def get_maintenance_message():
     try:
-        res = supabase.table("settings").select("*").eq("key", "maintenance_message").single().execute()
+        res = supabase.table("settings").select("*").eq("key", "maintenance_message").maybe_single().execute()
         return res.data.get("value") if res.data else "Server maintenance. Please try again later."
     except Exception as e:
         print(f"[ERROR] maintenance_message: {e}")
@@ -186,10 +188,10 @@ async def viber_webhook(req: Request):
     except Exception as e:
         print(f"[ERROR] Viber webhook error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
 if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.getenv("PORT", 8000))  # Render provided or fallback
     uvicorn.run("main:app", host="0.0.0.0", port=port)
-
-
+            
