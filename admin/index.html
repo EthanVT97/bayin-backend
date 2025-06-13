@@ -144,7 +144,7 @@
           localStorage.setItem("access_token", data.access_token);
           checkLogin();
         } else {
-          statusDiv.textContent = data.error?.message || data.error || "Login failed";
+          statusDiv.textContent = data.detail || data.error || "Login failed";
         }
       } catch (err) {
         statusDiv.textContent = "Network error. Try again.";
@@ -175,13 +175,13 @@
           },
         });
 
+        const data = await res.json();
+
         if (!res.ok) {
-          const errData = await res.json().catch(() => null);
-          resultBox.textContent = `❌ Failed: ${errData?.message || res.statusText}`;
+          resultBox.textContent = `❌ Failed: ${data.detail || data.message || res.statusText}`;
           return;
         }
 
-        const data = await res.json();
         resultBox.textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         resultBox.textContent = "Network error. Try again.";
