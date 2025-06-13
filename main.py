@@ -24,7 +24,6 @@ else:
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    # Simple welcome homepage
     content = """
     <html><head><title>YGN Real Estate Bot</title></head><body>
     <h1>Welcome to YGN Real Estate Bot Backend</h1>
@@ -32,6 +31,30 @@ async def root():
     </body></html>
     """
     return HTMLResponse(content=content)
+
+def get_maintenance_setting():
+    # Supabase မှာ settings table မှာ maintenance_mode flag နဲ့ message ရှာဖို့ logic
+    try:
+        response = supabase.table("settings").select("*").eq("key", "maintenance_mode").single().execute()
+        maintenance_mode = False
+        if response.data:
+            maintenance_mode = response.data.get("value") == "true"
+        else:
+            maintenance_mode = False
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch maintenance_mode setting: {e}")
+        maintenance_mode = False
+    return maintenance_mode
+
+def get_maintenance_message():
+    # Supabase မှာ maintenance_message ရှိရင်ယူမယ်၊ မရှိရင် default message ပြန်မယ်
+    try:
+        response = supabase.table("settings").select("*").eq("key", "maintenance_message").single().execute()
+        if response.data and response.data.get("value"):
+            return response.data.get("value")
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch maintenance_message setting: {e}")
+    return "Server maintenance. Please try again later."
 
 @app.get("/viber-webhook")
 async def viber_webhook_get():
@@ -44,6 +67,33 @@ async def viber_webhook_post(req: Request):
         print("[DEBUG] Incoming webhook payload:", body)
         event = body.get("event")
 
+        maintenance_mode = get_maintenance_setting()
+        if maintenance_mode:
+            # Maintenance mode ON ဖြစ်ရင် message event တွေကို maintenance message နဲ့ reply ပေးမယ်
+            if event == "message":
+                sender_id = body["sender"]["id"]
+                maintenance_msg = get_maintenance_message()
+
+                resp = requests.post(
+                    "https://chatapi.viber.com/pa/send_message",
+                    json={
+                        "receiver": sender_id,
+                        "min_api_version": 1,
+                        "sender": {
+                            "name": "YGN Real Estate Bot"
+                        },
+                        "type": "text",
+                        "text": maintenance_msg
+                    },
+                    headers={"X-Viber-Auth-Token": VIBER_TOKEN}
+                )
+                print(f"[INFO] Maintenance reply sent with status {resp.status_code}")
+                return {"status": 0}
+
+            # Message event မဟုတ်ရင် maintenance mode response ပြန်ပေး
+            return {"status": 0}
+
+        # Maintenance mode off ဖြစ်ရင် existing bot logic လုပ်ဆောင်မယ်
         if event == "message":
             sender_id = body["sender"]["id"]
             message_text = body["message"]["text"]
@@ -82,17 +132,15 @@ async def viber_webhook_post(req: Request):
 # Example API to list user data (placeholder)
 @app.get("/users")
 async def list_users():
-    # Placeholder logic: return dummy users list
     users = [
-        {"id": "user1", "name": "Aung Aung", "access_level": "basic"},
-        {"id": "user2", "name": "Su Su", "access_level": "admin"},
+        {"id": "user1", "name": "Admin အကိုကြီး", "access_level": "basic"},
+        {"id": "user2", "name": "Admin ညီမလေး", "access_level": "admin"},
     ]
     return {"users": users}
 
 # Example API to get payment summary (placeholder)
 @app.get("/payments/summary")
 async def payments_summary():
-    # Placeholder data
     summary = {
         "total_payments": 25,
         "total_amount": 1250000,
