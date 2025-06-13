@@ -1,15 +1,14 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-import requests
 import os
+import requests
 from openai import OpenAI
 from supabase import create_client, Client
 from prompt import build_prompt
 
 app = FastAPI()
 
-# Environment Variables
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -17,17 +16,27 @@ VIBER_TOKEN = os.getenv("VIBER_TOKEN")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 🔹 Root Route for status check
-@app.get("/")
-async def root():
-    return {"status": "ok", "message": "YGN Real Estate Bot API is running"}
+# Mount admin panel static folder only if exists
+if os.path.exists("admin"):
+    app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
+else:
+    print("[WARN] 'admin' directory does not exist; admin panel not mounted.")
 
-# 🔹 Viber Webhook: GET (for health check)
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    # Simple welcome homepage
+    content = """
+    <html><head><title>YGN Real Estate Bot</title></head><body>
+    <h1>Welcome to YGN Real Estate Bot Backend</h1>
+    <p>Visit <a href="/admin">/admin</a> for the Admin Panel (if available)</p>
+    </body></html>
+    """
+    return HTMLResponse(content=content)
+
 @app.get("/viber-webhook")
 async def viber_webhook_get():
     return {"status": "ok", "message": "Viber webhook endpoint is live"}
 
-# 🔹 Viber Webhook: POST (message handler)
 @app.post("/viber-webhook")
 async def viber_webhook_post(req: Request):
     try:
@@ -49,7 +58,6 @@ async def viber_webhook_post(req: Request):
             reply = response.choices[0].message.content
             print(f"[INFO] GPT reply: {reply}")
 
-            # Send reply to Viber
             resp = requests.post(
                 "https://chatapi.viber.com/pa/send_message",
                 json={
@@ -63,7 +71,7 @@ async def viber_webhook_post(req: Request):
                 },
                 headers={"X-Viber-Auth-Token": VIBER_TOKEN}
             )
-            print(f"[INFO] Viber send_message response: {resp.status_code}, body: {resp.text}")
+            print(f"[INFO] Viber send_message response status: {resp.status_code}, body: {resp.text}")
 
         return {"status": 0}
 
@@ -71,32 +79,28 @@ async def viber_webhook_post(req: Request):
         print(f"[ERROR] Exception in /viber-webhook: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# 🔹 Admin: List all users from Supabase
-@app.get("/admin/users")
+# Example API to list user data (placeholder)
+@app.get("/users")
 async def list_users():
-    try:
-        data = supabase.table("users").select("*").execute()
-        return data.data
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+    # Placeholder logic: return dummy users list
+    users = [
+        {"id": "user1", "name": "Aung Aung", "access_level": "basic"},
+        {"id": "user2", "name": "Su Su", "access_level": "admin"},
+    ]
+    return {"users": users}
 
-# 🔹 Admin: List latest chat messages
-@app.get("/admin/messages")
-async def list_messages():
-    try:
-        data = supabase.table("messages").select("*").order("created_at", desc=True).limit(50).execute()
-        return data.data
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+# Example API to get payment summary (placeholder)
+@app.get("/payments/summary")
+async def payments_summary():
+    # Placeholder data
+    summary = {
+        "total_payments": 25,
+        "total_amount": 1250000,
+        "currency": "MMK"
+    }
+    return summary
 
-# 🔹 Admin: List recent payments
-@app.get("/admin/payments")
-async def list_payments():
-    try:
-        data = supabase.table("payments").select("*").order("created_at", desc=True).limit(20).execute()
-        return data.data
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-# 🔹 Admin Panel Static Files (Optional - place index.html inside ./admin/)
-app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
+# Health check
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
