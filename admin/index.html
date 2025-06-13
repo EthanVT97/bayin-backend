@@ -46,11 +46,16 @@
       cursor: pointer;
       font-weight: bold;
     }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
     #status {
       margin-top: 1rem;
       font-size: 0.9rem;
       color: #ef4444;
       text-align: center;
+      min-height: 1.5rem;
     }
     #adminPanel {
       display: none;
@@ -59,6 +64,15 @@
     #logoutBtn {
       margin-top: 1rem;
       background: #ef4444;
+    }
+    pre {
+      background: #f9fafb;
+      padding: 1rem;
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
   </style>
 </head>
@@ -97,6 +111,7 @@
       if (token) {
         authSection.style.display = "none";
         adminPanel.style.display = "block";
+        statusDiv.textContent = "";
       } else {
         authSection.style.display = "block";
         adminPanel.style.display = "none";
@@ -104,43 +119,72 @@
     };
 
     loginBtn.addEventListener("click", async () => {
-      const email = emailInput.value;
-      const password = passwordInput.value;
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
       statusDiv.textContent = "";
 
-      const res = await fetch("/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      if (!email || !password) {
+        statusDiv.textContent = "Email နဲ့ Password ရိုက်ပါ။";
+        return;
+      }
 
-      const data = await res.json();
-      if (res.ok && data.access_token) {
-        localStorage.setItem("access_token", data.access_token);
-        checkLogin();
-      } else {
-        statusDiv.textContent = data.error || "Login failed";
+      loginBtn.disabled = true;
+      statusDiv.textContent = "Logging in...";
+
+      try {
+        const res = await fetch("/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.access_token) {
+          localStorage.setItem("access_token", data.access_token);
+          checkLogin();
+        } else {
+          statusDiv.textContent = data.error?.message || data.error || "Login failed";
+        }
+      } catch (err) {
+        statusDiv.textContent = "Network error. Try again.";
+      } finally {
+        loginBtn.disabled = false;
       }
     });
 
     logoutBtn.addEventListener("click", () => {
       localStorage.removeItem("access_token");
       checkLogin();
+      resultBox.textContent = "";
     });
 
     fetchUsersBtn.addEventListener("click", async () => {
       const token = localStorage.getItem("access_token");
-      const res = await fetch("/admin/users", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      if (!token) {
+        resultBox.textContent = "❌ Not logged in.";
+        return;
+      }
 
-      if (res.ok) {
+      resultBox.textContent = "Loading...";
+
+      try {
+        const res = await fetch("/admin/users", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          resultBox.textContent = `❌ Failed: ${errData?.message || res.statusText}`;
+          return;
+        }
+
         const data = await res.json();
         resultBox.textContent = JSON.stringify(data, null, 2);
-      } else {
-        resultBox.textContent = "❌ Failed to fetch users.";
+      } catch (err) {
+        resultBox.textContent = "Network error. Try again.";
       }
     });
 
