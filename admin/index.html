@@ -120,6 +120,7 @@
       transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
       user-select: none;
       display: inline-block;
+      width: auto;
     }
     #logoutBtn:hover {
       background-color: #b91c1c;
@@ -263,8 +264,4 @@
 
     const maintenanceToggle = document.getElementById('maintenanceToggle');
     const maintenanceMessage = document.getElementById('maintenanceMessage');
-    const saveBtn = document.getElementById('saveSettingsBtn');
-
-    // Focus management helper
-    function focusElement(el) {
-      if (el) el.focus();
+    const saveBtn = document
