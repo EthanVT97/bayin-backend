@@ -1,14 +1,14 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import requests
-import openai
 import os
+from openai import OpenAI
 from supabase import create_client, Client
 from prompt import build_prompt
 
 app = FastAPI()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 VIBER_TOKEN = os.getenv("VIBER_TOKEN")
@@ -31,18 +31,15 @@ async def viber_webhook_post(req: Request):
             message_text = body["message"]["text"]
             print(f"[INFO] Message from {sender_id}: {message_text}")
 
-            # Build prompt
             prompt = build_prompt(message_text)
 
-            # Call OpenAI
-            completion = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}]
             )
-            reply = completion.choices[0].message["content"]
+            reply = response.choices[0].message.content
             print(f"[INFO] GPT reply: {reply}")
 
-            # Send reply to Viber
             resp = requests.post(
                 "https://chatapi.viber.com/pa/send_message",
                 json={
