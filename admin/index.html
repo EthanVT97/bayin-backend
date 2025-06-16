@@ -6,8 +6,8 @@
   <title>YGN Real Estate Admin Panel</title>
   <style>
     body {
-      font-family: sans-serif;
-      background: #eef2f7;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f3f4f6;
       margin: 0;
       padding: 0;
       display: flex;
@@ -17,18 +17,17 @@
     }
     #app {
       background: white;
-      border-radius: 10px;
-      box-shadow: 0 0 25px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
       padding: 2rem;
-      max-width: 400px;
+      max-width: 420px;
       width: 100%;
     }
     h1 {
       text-align: center;
-      color: #1e3a8a;
+      color: #111827;
     }
     input, button {
-      display: block;
       width: 100%;
       margin-top: 1rem;
       padding: 0.8rem;
@@ -37,14 +36,18 @@
       box-sizing: border-box;
     }
     input {
-      border: 1px solid #ccc;
+      border: 1px solid #d1d5db;
     }
     button {
       background: #2563eb;
       color: white;
       border: none;
-      cursor: pointer;
       font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #1d4ed8;
     }
     button:disabled {
       opacity: 0.6;
@@ -53,7 +56,7 @@
     #status {
       margin-top: 1rem;
       font-size: 0.9rem;
-      color: #ef4444;
+      color: #dc2626;
       text-align: center;
       min-height: 1.5rem;
     }
@@ -63,16 +66,26 @@
     }
     #logoutBtn {
       margin-top: 1rem;
-      background: #ef4444;
+      background: #dc2626;
     }
     pre {
       background: #f9fafb;
       padding: 1rem;
       border-radius: 8px;
-      max-height: 200px;
+      max-height: 250px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
+      font-size: 0.85rem;
+    }
+    .toast {
+      background: #16a34a;
+      color: white;
+      padding: 0.5rem;
+      border-radius: 5px;
+      text-align: center;
+      margin-top: 1rem;
+      display: none;
     }
   </style>
 </head>
@@ -81,8 +94,8 @@
     <h1>Admin Login</h1>
 
     <div id="authSection">
-      <input type="email" id="email" placeholder="Email" />
-      <input type="password" id="password" placeholder="Password" />
+      <input type="email" id="email" placeholder="Email" autocomplete="email" />
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
       <button id="loginBtn">Log In</button>
       <div id="status"></div>
     </div>
@@ -90,9 +103,11 @@
     <div id="adminPanel">
       <p>✅ Logged in as Admin</p>
       <button id="fetchUsersBtn">Fetch Admin Users</button>
-      <pre id="resultBox"></pre>
+      <pre id="resultBox">No data loaded yet.</pre>
       <button id="logoutBtn">Log Out</button>
     </div>
+
+    <div id="toast" class="toast"></div>
   </div>
 
   <script>
@@ -105,6 +120,16 @@
     const logoutBtn = document.getElementById("logoutBtn");
     const fetchUsersBtn = document.getElementById("fetchUsersBtn");
     const resultBox = document.getElementById("resultBox");
+    const toast = document.getElementById("toast");
+
+    const showToast = (msg, success = true) => {
+      toast.textContent = msg;
+      toast.style.background = success ? '#16a34a' : '#dc2626';
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
+    };
 
     const checkLogin = () => {
       const token = localStorage.getItem("access_token");
@@ -124,12 +149,12 @@
       statusDiv.textContent = "";
 
       if (!email || !password) {
-        statusDiv.textContent = "Email နဲ့ Password ရိုက်ပါ။";
+        statusDiv.textContent = "📌 Email နဲ့ Password ရိုက်ထည့်ပါ။";
         return;
       }
 
       loginBtn.disabled = true;
-      statusDiv.textContent = "Logging in...";
+      statusDiv.textContent = "🔐 Logging in...";
 
       try {
         const res = await fetch("/auth/login", {
@@ -142,12 +167,13 @@
 
         if (res.ok && data.access_token) {
           localStorage.setItem("access_token", data.access_token);
+          showToast("🎉 Login success");
           checkLogin();
         } else {
           statusDiv.textContent = data.detail || data.error || "Login failed";
         }
       } catch (err) {
-        statusDiv.textContent = "Network error. Try again.";
+        statusDiv.textContent = "❌ Network error. Try again.";
       } finally {
         loginBtn.disabled = false;
       }
@@ -155,8 +181,9 @@
 
     logoutBtn.addEventListener("click", () => {
       localStorage.removeItem("access_token");
+      resultBox.textContent = "No data loaded yet.";
+      showToast("Logged out", false);
       checkLogin();
-      resultBox.textContent = "";
     });
 
     fetchUsersBtn.addEventListener("click", async () => {
@@ -166,7 +193,7 @@
         return;
       }
 
-      resultBox.textContent = "Loading...";
+      resultBox.textContent = "📦 Loading users...";
 
       try {
         const res = await fetch("/admin/users", {
@@ -178,13 +205,13 @@
         const data = await res.json();
 
         if (!res.ok) {
-          resultBox.textContent = `❌ Failed: ${data.detail || data.message || res.statusText}`;
+          resultBox.textContent = `❌ Failed: ${data.detail || res.statusText}`;
           return;
         }
 
         resultBox.textContent = JSON.stringify(data, null, 2);
       } catch (err) {
-        resultBox.textContent = "Network error. Try again.";
+        resultBox.textContent = "❌ Network error. Try again.";
       }
     });
 
