@@ -72,17 +72,15 @@ def verify_jwt_token(auth: str = Header(...)):
         raise HTTPException(status_code=403, detail="Admin only")
     return payload
 
-# --------------- Admin UI helpers ---------------
+# --------------- Admin ---------------
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    return HTMLResponse(
-        """
-        <html><head><title>YGN Real Estate Bot</title></head><body>
-        <h1>Welcome to YGN Real Estate Bot Backend</h1>
-        <p>Visit <a href="/admin">/admin</a> for the Admin Panel</p>
-        </body></html>
-        """
-    )
+    return HTMLResponse("""
+    <html><head><title>YGN Real Estate Bot</title></head><body>
+    <h1>Welcome to YGN Real Estate Bot Backend</h1>
+    <p>Visit <a href="/admin">/admin</a> for the Admin Panel</p>
+    </body></html>
+    """)
 
 @app.get("/admin/users")
 async def list_users(_: dict = Depends(verify_jwt_token)):
@@ -101,7 +99,7 @@ async def payments_summary(_: dict = Depends(verify_jwt_token)):
 async def health():
     return {"status": "healthy"}
 
-# --------------- Maintenance helpers ---------------
+# -------- Maintenance Mode --------
 def get_maintenance_setting() -> bool:
     try:
         res = supabase.table("settings").select("*").eq("key", "maintenance_mode").maybe_single().execute()
@@ -119,7 +117,7 @@ def get_maintenance_message() -> str:
         print("[ERROR] maintenance_message:", e)
     return "Server maintenance. Please try again later."
 
-# --------------- Viber webhook ---------------
+# --------------- Viber Webhook ---------------
 @app.get("/viber-webhook")
 async def webhook_check():
     return {"status": "ok", "message": "Viber webhook live"}
@@ -128,28 +126,34 @@ async def webhook_check():
 async def viber_webhook(req: Request):
     try:
         body = await req.json()
-        print("[DEBUG] Viber payload:", body)
+        print("[DEBUG] Incoming Viber Webhook:", body)
 
         event = body.get("event")
-        sender_id = body.get("sender", {}).get("id", "")
-        message_text = body.get("message", {}).get("text", "")
+        # 💡 updated to match actual payload from your logs
+        contact_id = body.get("data", {}).get("contact", {}).get("id", "")
+        message_text = body.get("data", {}).get("content", {}).get("payload", "")
+
+        print(f"[DEBUG] event={event}, contact_id={contact_id}, message={message_text}")
+
+        if not contact_id or not message_text:
+            print("[WARN] Missing sender ID or message payload")
+            return {"status": "ignored"}
 
         if get_maintenance_setting():
-            if event == "message":
-                requests.post(
-                    "https://chatapi.viber.com/pa/send_message",
-                    json={
-                        "receiver": sender_id,
-                        "min_api_version": 1,
-                        "sender": {"name": "YGN Real Estate Bot"},
-                        "type": "text",
-                        "text": get_maintenance_message(),
-                    },
-                    headers={"X-Viber-Auth-Token": VIBER_TOKEN},
-                )
-            return {"status": 0}
+            requests.post(
+                "https://chatapi.viber.com/pa/send_message",
+                json={
+                    "receiver": contact_id,
+                    "min_api_version": 1,
+                    "sender": {"name": "YGN Real Estate Bot"},
+                    "type": "text",
+                    "text": get_maintenance_message(),
+                },
+                headers={"X-Viber-Auth-Token": VIBER_TOKEN},
+            )
+            return {"status": "maintenance"}
 
-        if event == "message" and len(message_text) < 1000:
+        if event == "message_received" and len(message_text) < 1000:
             prompt = build_prompt(message_text)
             gpt_reply = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -159,7 +163,7 @@ async def viber_webhook(req: Request):
             requests.post(
                 "https://chatapi.viber.com/pa/send_message",
                 json={
-                    "receiver": sender_id,
+                    "receiver": contact_id,
                     "min_api_version": 1,
                     "sender": {"name": "YGN Real Estate Bot"},
                     "type": "text",
@@ -167,13 +171,15 @@ async def viber_webhook(req: Request):
                 },
                 headers={"X-Viber-Auth-Token": VIBER_TOKEN},
             )
-        return {"status": 0}
+        else:
+            print("[DEBUG] Unsupported or invalid message")
+        return {"status": "ok"}
 
     except Exception as e:
-        print("[ERROR] Viber webhook:", e)
+        print("[ERROR] viber_webhook:", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# --------------- Entrypoint ---------------
+# ---------- Entrypoint ----------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
