@@ -81,5 +81,5 @@ MIT License
 ## Contact
 
 Project maintained by Ethan  
-Email: your-email@example.com  
-GitHub: https://github.com/yourgithub
+Email: info@ygnb2b.com  
+GitHub: https://github.com/EthanVT97
