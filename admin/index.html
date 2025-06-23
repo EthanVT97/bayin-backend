@@ -1,63 +1,71 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin Panel</title>
+  <title>YGN Admin Panel</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f3f4f6;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f9fafb;
       margin: 0;
       padding: 0;
       display: flex;
       justify-content: center;
-      align-items: center;
-      height: 100vh;
+      align-items: flex-start;
+      min-height: 100vh;
+      color: #111827;
+      padding-top: 2rem;
     }
     #app {
       background: white;
       border-radius: 12px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
       padding: 2rem;
-      max-width: 480px;
+      max-width: 520px;
       width: 100%;
+      box-sizing: border-box;
     }
     h1 {
       text-align: center;
-      color: #111827;
+      margin-bottom: 1rem;
     }
-    input, button, select {
+    input, button {
       width: 100%;
+      padding: 0.75rem 1rem;
       margin-top: 1rem;
-      padding: 0.8rem;
       border-radius: 8px;
       font-size: 1rem;
       box-sizing: border-box;
-    }
-    input, select {
       border: 1px solid #d1d5db;
+      transition: border-color 0.3s ease;
+    }
+    input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 5px #2563eb;
     }
     button {
-      background: #2563eb;
-      color: white;
+      background-color: #2563eb;
       border: none;
-      font-weight: bold;
+      color: white;
+      font-weight: 600;
       cursor: pointer;
-      transition: background 0.3s;
+      transition: background-color 0.3s ease;
     }
-    button:hover {
-      background: #1d4ed8;
+    button:hover:not(:disabled) {
+      background-color: #1d4ed8;
     }
     button:disabled {
-      opacity: 0.6;
+      background-color: #93c5fd;
       cursor: not-allowed;
     }
     #status {
-      margin-top: 1rem;
+      margin-top: 0.75rem;
       font-size: 0.9rem;
+      min-height: 1.2em;
       color: #dc2626;
       text-align: center;
-      min-height: 1.5rem;
     }
     #adminPanel {
       display: none;
@@ -65,63 +73,109 @@
     }
     #logoutBtn {
       margin-top: 1rem;
-      background: #dc2626;
+      background-color: #dc2626;
+    }
+    #logoutBtn:hover {
+      background-color: #b91c1c;
     }
     pre {
-      background: #f9fafb;
+      background: #f3f4f6;
       padding: 1rem;
       border-radius: 8px;
-      max-height: 300px;
+      max-height: 320px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 0.85rem;
+      margin-top: 1rem;
+      color: #374151;
     }
     .toast {
-      background: #16a34a;
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      background-color: #16a34a;
       color: white;
-      padding: 0.5rem;
-      border-radius: 5px;
-      text-align: center;
-      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
       display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 9999;
+      user-select: none;
+    }
+    .toast.error {
+      background-color: #dc2626;
     }
     .tx-btn {
-      background: #10b981;
+      background-color: #10b981;
       color: white;
       border: none;
-      padding: 6px 10px;
+      padding: 6px 12px;
       font-size: 0.85rem;
       margin-top: 0.5rem;
       border-radius: 6px;
       cursor: pointer;
+      transition: background-color 0.3s ease;
     }
-    .tx-btn:hover {
-      background: #059669;
+    .tx-btn:hover:not(:disabled) {
+      background-color: #059669;
+    }
+    .tx-btn:disabled {
+      background-color: #6ee7b7;
+      cursor: not-allowed;
+    }
+    .transaction-item {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 0.5rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #viberEvents {
+      margin-top: 1rem;
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 0.5rem;
+      background: #eef2ff;
+      font-size: 0.9rem;
+      color: #3730a3;
+    }
+    #viberEvents strong {
+      color: #1e40af;
     }
   </style>
 </head>
 <body>
   <div id="app">
-    <h1>Admin Login</h1><div id="authSection">
-  <input type="email" id="email" placeholder="Email" autocomplete="email" />
-  <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
-  <button id="loginBtn">Log In</button>
-  <div id="status"></div>
-</div>
+    <h1>Admin Login</h1>
+    <div id="authSection">
+      <input type="email" id="email" placeholder="Email" autocomplete="email" />
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
+      <button id="loginBtn">Log In</button>
+      <div id="status"></div>
+    </div>
 
-<div id="adminPanel">
-  <p>✅ Logged in as Admin</p>
-  <button id="fetchUsersBtn">Fetch Admin Users</button>
-  <button id="fetchPaymentsBtn">Summary: Payments</button>
-  <button id="fetchTxBtn">Fetch Transactions</button>
-  <pre id="resultBox">No data loaded yet.</pre>
-  <button id="logoutBtn">Log Out</button>
-</div>
+    <div id="adminPanel">
+      <p><strong>✅ Logged in as Admin</strong></p>
+      <button id="fetchUsersBtn">Fetch Admin Users</button>
+      <button id="fetchPaymentsBtn">Fetch Payments Summary</button>
+      <button id="fetchTxBtn">Fetch Transactions</button>
 
-<div id="toast" class="toast"></div>
+      <pre id="resultBox">No data loaded yet.</pre>
 
-  </div>  <script>
+      <h3>🟣 Recent Viber Events (Webhook)</h3>
+      <div id="viberEvents">No events yet.</div>
+
+      <button id="logoutBtn">Log Out</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
     const loginBtn = document.getElementById("loginBtn");
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
@@ -134,31 +188,50 @@
     const fetchTxBtn = document.getElementById("fetchTxBtn");
     const resultBox = document.getElementById("resultBox");
     const toast = document.getElementById("toast");
+    const viberEventsDiv = document.getElementById("viberEvents");
 
-    const showToast = (msg, success = true) => {
-      toast.textContent = msg;
-      toast.style.background = success ? '#16a34a' : '#dc2626';
-      toast.style.display = 'block';
-      setTimeout(() => toast.style.display = 'none', 3000);
-    };
+    // Toast message helper
+    function showToast(message, success = true) {
+      toast.textContent = message;
+      toast.className = "toast";
+      if (!success) toast.classList.add("error");
+      toast.style.display = "block";
+      setTimeout(() => {
+        toast.style.display = "none";
+      }, 3000);
+    }
 
-    const checkLogin = () => {
+    // Check login and update UI
+    function checkLogin() {
       const token = localStorage.getItem("access_token");
-      authSection.style.display = token ? "none" : "block";
-      adminPanel.style.display = token ? "block" : "none";
-      statusDiv.textContent = "";
-    };
+      if (token) {
+        authSection.style.display = "none";
+        adminPanel.style.display = "block";
+        statusDiv.textContent = "";
+        if (!window.websocketStarted) startWebSocket();
+        if (!window.pollingStarted) startViberPolling();
+      } else {
+        authSection.style.display = "block";
+        adminPanel.style.display = "none";
+        statusDiv.textContent = "";
+        resultBox.textContent = "No data loaded yet.";
+        stopWebSocket();
+        stopViberPolling();
+      }
+    }
 
+    // Login handler
     loginBtn.addEventListener("click", async () => {
       const email = emailInput.value.trim();
       const password = passwordInput.value.trim();
-      statusDiv.textContent = "";
+
       if (!email || !password) {
-        statusDiv.textContent = "📌 Email နဲ့ Password ရိုက်ထည့်ပါ။";
+        statusDiv.textContent = "📌 Email နဲ့ Password နှစ်ခုလုံးရိုက်ထည့်ပါ။";
         return;
       }
       loginBtn.disabled = true;
-      statusDiv.textContent = "🔐 Logging in...";
+      statusDiv.textContent = "🔐 Login လုပ်နေသည်...";
+
       try {
         const res = await fetch("/auth/login", {
           method: "POST",
@@ -168,97 +241,124 @@
         const data = await res.json();
         if (res.ok && data.access_token) {
           localStorage.setItem("access_token", data.access_token);
-          showToast("🎉 Login success");
+          showToast("🎉 Login အောင်မြင်ပါသည်");
           checkLogin();
         } else {
-          statusDiv.textContent = data.detail || data.error || "Login failed";
+          statusDiv.textContent = data.detail || data.error || "Login မအောင်မြင်ပါ";
         }
-      } catch (err) {
-        statusDiv.textContent = "❌ Network error. Try again.";
+      } catch (e) {
+        statusDiv.textContent = "❌ Network error ဖြစ်နေသည်။ နောက်မှ ထပ်ကြိုးစားပါ။";
       } finally {
         loginBtn.disabled = false;
       }
     });
 
+    // Logout handler
     logoutBtn.addEventListener("click", () => {
       localStorage.removeItem("access_token");
-      resultBox.textContent = "No data loaded yet.";
-      showToast("Logged out", false);
       checkLogin();
+      showToast("Logged out", false);
     });
 
-    fetchUsersBtn.addEventListener("click", async () => {
-      await fetchAndDisplay("/admin/users");
-    });
-
-    fetchPaymentsBtn.addEventListener("click", async () => {
-      await fetchAndDisplay("/payments/summary");
-    });
-
-    fetchTxBtn.addEventListener("click", async () => {
+    // Authenticated fetch helper
+    async function fetchWithAuth(endpoint, options = {}) {
       const token = localStorage.getItem("access_token");
-      if (!token) return showToast("Not logged in", false);
-      resultBox.textContent = "📦 Loading transactions...";
-      try {
-        const res = await fetch("/admin/analytics", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const stats = await res.json();
-
-        const txRes = await fetch("/payments/summary", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const txData = await txRes.json();
-
-        resultBox.innerHTML = `Total Transactions: ${txData.total_transactions}\nDeposit: ${txData.total_deposit_amount} MMK\nWithdraw: ${txData.total_withdraw_amount} MMK\n`;
-
-        const txList = txData.transactions || [];
-        txList.forEach(tx => {
-          const div = document.createElement("div");
-          div.innerHTML = `🔄 ${tx.type}: ${tx.amount} MMK - Status: ${tx.status}`;
-          if (tx.status === "pending") {
-            const btn = document.createElement("button");
-            btn.className = "tx-btn";
-            btn.textContent = "✅ Approve";
-            btn.onclick = async () => {
-              const res = await fetch("/admin/approve-transaction", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ tx_id: tx.id })
-              });
-              if (res.ok) {
-                showToast("Transaction approved");
-                btn.disabled = true;
-                btn.textContent = "Approved ✔️";
-              } else {
-                showToast("Failed to approve", false);
-              }
-            };
-            div.appendChild(btn);
-          }
-          resultBox.appendChild(div);
-        });
-      } catch (err) {
-        resultBox.textContent = "❌ Network error.";
+      if (!token) {
+        showToast("Not logged in", false);
+        return null;
       }
-    });
-
-    async function fetchAndDisplay(endpoint) {
-      const token = localStorage.getItem("access_token");
-      if (!token) return showToast("Not logged in", false);
-      resultBox.textContent = `Loading ${endpoint}...`;
+      const headers = options.headers || {};
+      headers["Authorization"] = `Bearer ${token}`;
       try {
-        const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
-        const data = await res.json();
-        resultBox.textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        resultBox.textContent = "❌ Network error.";
+        const res = await fetch(endpoint, { ...options, headers });
+        if (res.status === 401) {
+          showToast("Session expired. Please log in again.", false);
+          localStorage.removeItem("access_token");
+          checkLogin();
+          return null;
+        }
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "Error fetching data");
+        }
+        return await res.json();
+      } catch (e) {
+        showToast(e.message || "Network error", false);
+        return null;
       }
     }
 
-    checkLogin();
-  </script></body>
-</html>
+    // Fetch Admin Users
+    fetchUsersBtn.addEventListener("click", async () => {
+      resultBox.textContent = "Loading Admin Users...";
+      const data = await fetchWithAuth("/admin/users");
+      if (data) {
+        resultBox.textContent = JSON.stringify(data.admin_users, null, 2);
+      }
+    });
+
+    // Fetch Payments Summary
+    fetchPaymentsBtn.addEventListener("click", async () => {
+      resultBox.textContent = "Loading Payments Summary...";
+      const data = await fetchWithAuth("/payments/summary");
+      if (data) {
+        const { total_transactions, total_deposit_amount, total_withdraw_amount } = data;
+        resultBox.textContent =
+          `📊 Total Transactions: ${total_transactions}\n` +
+          `💰 Total Deposit: ${total_deposit_amount} MMK\n` +
+          `🏧 Total Withdraw: ${total_withdraw_amount} MMK`;
+      }
+    });
+
+    // Fetch Transactions with Approve Buttons
+    fetchTxBtn.addEventListener("click", async () => {
+      resultBox.textContent = "Loading Transactions...";
+      const data = await fetchWithAuth("/payments/summary");
+      if (!data || !data.transactions) {
+        resultBox.textContent = "No transactions available.";
+        return;
+      }
+      resultBox.innerHTML = "";
+      data.transactions.forEach(tx => {
+        const div = document.createElement("div");
+        div.className = "transaction-item";
+        div.textContent = `🔄 ${tx.type.toUpperCase()}: ${tx.amount} MMK - Status: ${tx.status}`;
+        if (tx.status === "pending") {
+          const btn = document.createElement("button");
+          btn.className = "tx-btn";
+          btn.textContent = "✅ Approve";
+          btn.onclick = async () => {
+            btn.disabled = true;
+            btn.textContent = "Approving...";
+            try {
+              const res = await fetchWithAuth("/admin/approve-transaction", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tx_id: tx.id }),
+              });
+              if (res && res.status === "approved") {
+                showToast("Transaction approved");
+                btn.textContent = "Approved ✔️";
+              } else {
+                throw new Error("Failed to approve");
+              }
+            } catch {
+              showToast("Failed to approve transaction", false);
+              btn.disabled = false;
+              btn.textContent = "✅ Approve";
+            }
+          };
+          div.appendChild(btn);
+        }
+        resultBox.appendChild(div);
+      });
+    });
+
+    // Polling for Viber webhook events (every 10 seconds)
+    let viberPollingInterval;
+    let lastEventId = 0;
+
+    async function pollViberEvents() {
+      const data = await fetchWithAuth("/admin/viber-events?last_id=" + lastEventId);
+      if (data && data.events && data.events.length) {
+        data.events.forEach(ev
