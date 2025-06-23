@@ -1,85 +1,252 @@
+YGN Bot Service - Viber ဘော့တ်
 
-# YGN Real Estate Bot (Demo)
+ဒီ project ဟာ FastAPI ကို အသုံးပြုပြီးတည်ဆောက်ထားတဲ့ Viber Bot တစ်ခုဖြစ်ပါတယ်။ ငွေသွင်း/ငွေထုတ် တောင်းဆိုမှုတွေကို stateful conversation logic နဲ့ကိုင်တွယ်ပေးနိုင်ပြီး၊ Admin တွေအတွက် JWT authentication ပါဝင်တဲ့ dashboard တစ်ခုလည်း ပါရှိပါတယ်။ Database အတွက် Supabase ကို အသုံးပြုထားပါတယ်။
 
-YGN Real Estate Bot သည် GPT-3.5 အခြေခံပြီး ရန်ကုန်မြို့ အိမ်ခြံမြေသတင်းများကို Viber မှတဆင့် အမြန်ဆုံး ဖြေကြားပေးသော chatbot ဖြစ်ပါသည်။
+အဓိက Features များ
 
-## Features
+Viber Bot Integration: ငွေသွင်း၊ ငွေထုတ် လုပ်ငန်းစဥ်များအတွက် အဆင့်လိုက်တုံ့ပြန်မှု (Stateful Logic)။
 
-- အိမ်ခြံမြေ ငှားရန် / ရောင်းရန် မေးခွန်းများကို ဖြေကြားနိုင်ခြင်း
-- မြေကွက်၊ တိုက်ခန်း စျေးနှုန်း မေးခွန်းများ
-- တည်နေရာအထောက်အထားများ (ဥပမာ - ဒဂုံမြို့သစ်မြောက်ပိုင်း)
-- ဈေးနှုန်း နှိုင်းယှဉ်ခြင်း
-- လစဉ်ငှားစျေးနှင့် ငွေပေးချေမှု ရွေးချယ်စရာများ
+Admin Panel: Admin များအတွက် Login, Analytics နှင့် Transaction Approval ပြုလုပ်နိုင်သော Endpoint များ။
 
-## Requirements
+JWT Authentication: Admin Endpoint များကို HS256 JWT ဖြင့် လုံခြုံအောင်ပြုလုပ်ထားခြင်း။
 
-- Python 3.9+
-- Supabase account and project
-- Viber Public Account with webhook setup
-- OpenAI API key (GPT-3.5 Turbo)
+Supabase Integration: User data, transaction logs များကို Supabase (PostgreSQL) တွင် သိမ်းဆည်းခြင်း။
 
-## Setup
+Rate Limiting: Request များ အလွန်အကျွံဝင်လာခြင်းကို ကာကွယ်ပေးခြင်း။
 
-1. `.env` ဖိုင်ကို root folder ထဲမှာဖန်တီးပြီး အောက်ပါအတိုင်း သင့် credentials များ ထည့်သွင်းပါ။
+Health Check: Service ၏ ကျန်းမာရေးအခြေအနေကို စစ်ဆေးနိုင်သော /health endpoint။
 
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-SUPABASE_URL=https://your_supabase_url.supabase.co
-SUPABASE_KEY=your_supabase_anon_or_service_key
-SUPABASE_JWT_SECRET=your_supabase_jwt_secret
-VIBER_TOKEN=your_viber_auth_token
-PORT=8000
-```
+Webhook Security: Viber မှ ပေးပို့သော request များကို X-Viber-Content-Signature ဖြင့် စစ်ဆေးခြင်း။
 
-2. Python dependencies များ install လုပ်ပါ။
+Environment-based Configuration: .env ဖိုင်ဖြင့် လွယ်ကူစွာ setup ပြုလုပ်နိုင်ခြင်း။
 
-```bash
-pip install fastapi uvicorn supabase openai bcrypt pyjwt requests
-```
+အသုံးပြုထားသော နည်းပညာများ
 
-3. Local သို့ Run
+Backend: Python 3, FastAPI
 
-```bash
+Database: Supabase (PostgreSQL)
+
+Authentication: PyJWT, bcrypt
+
+API Client: HTTPX, Requests
+
+ASGI Server: Uvicorn
+
+Local မှာ Setup ပြုလုပ်ခြင်း
+၁။ Project ကို Clone ပြုလုပ်ပါ
+Generated bash
+git clone <your-repository-url>
+cd <your-repository-folder>
+
+၂။ Virtual Environment สร้างပြီး Activate လုပ်ပါ
+Generated bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS / Linux
+python3 -m venv venv
+source venv/bin/activate
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+၃။ requirements.txt ဖိုင်สร้างပါ
+
+သင့် project folder ထဲမှာ requirements.txt ဆိုတဲ့ဖိုင်တစ်ခုဆောက်ပြီး အောက်ပါ dependency များကို ထည့်သွင်းပါ။
+
+Generated txt
+fastapi
+uvicorn[standard]
+supabase
+python-dotenv
+pyjwt
+bcrypt
+httpx
+requests
+gunicorn
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Txt
+IGNORE_WHEN_COPYING_END
+၄။ Dependency များကို Install လုပ်ပါ
+Generated bash
+pip install -r requirements.txt
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+၅။ Environment Variables (.env) ဖိုင်ပြင်ဆင်ပါ
+
+Project folder ထဲမှာ .env ဆိုတဲ့ ဖိုင်တစ်ခုဆောက်ပြီး အောက်ပါအတိုင်း သင့်ရဲ့ key များကို ဖြည့်စွက်ပါ။
+
+Generated env
+# Supabase
+SUPABASE_URL="https://your-project-ref.supabase.co"
+SUPABASE_KEY="your-supabase-anon-key"
+SUPABASE_JWT_SECRET="your-supabase-jwt-secret" # Supabase > Project Settings > API > JWT Secret
+
+# Viber
+VIBER_TOKEN="your-viber-bot-auth-token"
+VIBER_WEBHOOK_SECRET="some-very-strong-secret-string-for-webhook" # လုံခြုံရေးအတွက် ကိုယ်တိုင်สร้างထားတဲ့ စာတန်း
+
+# OpenAI (Optional)
+# OPENAI_API_KEY="your-openai-key"
+
+# Environment
+ENVIRONMENT="development"
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Env
+IGNORE_WHEN_COPYING_END
+၆။ Supabase Database Setup
+
+Supabase project ထဲက SQL Editor မှာ အောက်ပါ table များကို run ပြီး สร้างပါ။
+
+<details>
+<summary>Supabase SQL Schema (နှိပ်ပြီးကြည့်ပါ)</summary>
+
+Generated sql
+-- viber_users table (Viber မှ user များကို မှတ်ရန်)
+CREATE TABLE viber_users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    viber_id TEXT NOT NULL UNIQUE,
+    name TEXT,
+    account_id TEXT UNIQUE,
+    state TEXT DEFAULT 'AWAITING_ACCOUNT_ID',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- transactions table (ငွေသွင်း/ငွေထုတ် မှတ်တမ်း)
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES viber_users(id),
+    type TEXT NOT NULL, -- 'deposit' or 'withdraw'
+    amount NUMERIC NOT NULL,
+    status TEXT DEFAULT 'pending', -- 'pending', 'completed', 'rejected'
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- users table (Admin panel အတွက်)
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    role TEXT DEFAULT 'admin',
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login TIMESTAMPTZ,
+    login_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Admin user တစ်ယောက်ကို စမ်းသပ်ရန်အတွက် ထည့်သွင်းခြင်း
+-- မှတ်ချက်: password ကို bcrypt ဖြင့် hash လုပ်ပြီးမှ ထည့်ရန်လိုအပ်ပါသည်။
+-- Local မှာ python script တစ်ခုဖြင့် hash လုပ်ပြီးမှ Supabase မှာထည့်ပါ။
+-- INSERT INTO users (email, password, role) VALUES ('admin@example.com', 'hashed_password_here', 'admin');
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+SQL
+IGNORE_WHEN_COPYING_END
+</details>
+
+၇။ Local Server ကို Run ပါ
+Generated bash
 uvicorn main:app --reload
-```
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
 
-4. Public URL ရရှိရန် ngrok သို့မဟုတ် Cloud deployment (Render, Railway, Heroku) အသုံးပြုပါ။
+Browser မှာ http://127.0.0.1:8000 ကိုသွားပြီး "🏠 YGN Bot Service" စာတန်းကိုမြင်ရရင် အောင်မြင်ပါတယ်။
 
-5. Viber bot dashboard မှ webhook URL ကို
+Render.com တွင် Deploy ပြုလုပ်ခြင်း
 
-```
-https://yourdomain.com/viber-webhook
-```
+Render မှာ deploy ပြုလုပ်ရန် အလွန်လွယ်ကူပါတယ်။
 
-အဖြစ် သတ်မှတ်ပါ။
+အဆင့် ၁: New Web Service สร้างပါ
 
-## API Endpoints
+Render Dashboard မှာ "New +" ကိုနှိပ်ပြီး "Web Service" ကိုရွေးပါ။
 
-- `POST /auth/login` – Email နဲ့ Password ဖြင့် login လုပ်ပြီး JWT token ရယူခြင်း
-- `GET /admin/users` – Admin user list ကို token ဖြင့် access
-- `GET /payments/summary` – Payment summary များကို admin access ဖြင့်
-- `GET /health` – Server health status
-- `GET /viber-webhook` – Viber webhook check
-- `POST /viber-webhook` – Viber message event handler
+သင့် GitHub account ကိုချိတ်ဆက်ပြီး ဒီ project repository ကို ရွေးချယ်ပါ။
 
-## Security
+အဆင့် ၂: Settings များကို ဖြည့်စွက်ပါ
 
-- Passwords are hashed with bcrypt
-- JWT token authentication with role-based access control (admin-only routes)
-- Maintenance mode controlled from Supabase settings
+Name: သင့် service အတွက် နာမည်တစ်ခုပေးပါ (ဥပမာ ygn-bot-service)။
 
-## Maintenance Mode
+Region: သင့်နဲ့အနီးဆုံး region ကိုရွေးပါ။
 
-- Maintenance mode ဖွင့်ထားလျှင် Viber users များအား အလိုအလျောက် maintenance message ပေးပို့ပါသည်။
+Branch: main (သို့) သင်အသုံးပြုလိုသော branch ကိုရွေးပါ။
 
-## License
+Root Directory: . (そのままထားပါ)
 
-MIT License
+Runtime: Python 3
 
----
+Build Command: pip install -r requirements.txt
 
-## Contact
+Start Command: gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
 
-Project maintained by Ethan  
-Email: info@ygnb2b.com  
-GitHub: https://github.com/EthanVT97
+(သို့မဟုတ်) uvicorn main:app --host 0.0.0.0 --port $PORT
+
+အဆင့် ၃: Environment Variables များကို ထည့်သွင်းပါ
+
+"Advanced" ကိုနှိပ်ပြီး "Add Environment Variable" ဖြင့် သင့် .env ဖိုင်ထဲက key တွေအားလုံးကို တစ်ခုချင်းစီ ထည့်သွင်းပါ။
+
+Key: SUPABASE_URL, Value: https://...
+
+Key: SUPABASE_KEY, Value: your-key...
+
+Key: SUPABASE_JWT_SECRET, Value: your-jwt-secret...
+
+Key: VIBER_TOKEN, Value: your-viber-token...
+
+Key: VIBER_WEBHOOK_SECRET, Value: your-secret-string...
+
+Key: ENVIRONMENT, Value: production
+
+အဆင့် ၄: Deploy ပြုလုပ်ပါ
+
+"Create Web Service" ကိုနှိပ်ပြီး deploy process ကိုစောင့်ပါ။
+
+Deploy ပြီးသွားရင် Render က သင့် service အတွက် public URL တစ်ခုပေးပါလိမ့်မယ်။ (ဥပမာ https://ygn-bot-service.onrender.com)
+
+အဆင့် ၅: Viber Webhook ကို Set လုပ်ပါ
+
+သင်၏ Viber Admin Panel ကိုသွားပါ။
+
+"Webhook URL" နေရာမှာ Render ကပေးတဲ့ URL နောက်မှာ /viber-webhook ကိုထည့်ပေးပါ။
+
+ဥပမာ: https://ygn-bot-service.onrender.com/viber-webhook
+
+Event Types တွေအားလုံးကို အမှန်ခြစ်ပေးပြီး Save လုပ်ပါ။
+
+ယခုဆိုလျှင် သင်၏ Viber bot သည် Render server ပေါ်တွင် အလုပ်လုပ်နေပြီဖြစ်ပါသည်။
+
+API Endpoints
+
+GET /: Root endpoint.
+
+GET /docs: FastAPI Swagger UI (API Documentation).
+
+GET /health: Service health check.
+
+POST /viber-webhook: Viber မှ data လက်ခံမည့် အဓိက endpoint။
+
+POST /auth/login: Admin များအတွက် login endpoint။
+
+GET /admin/analytics: Admin များအတွက် analytics data ကြည့်ရန်။
+
+POST /admin/approve-transaction: Admin များအတွက် transaction ကို approve လုပ်ရန်။
+
+GET /admin: Admin panel frontend (static files)။
