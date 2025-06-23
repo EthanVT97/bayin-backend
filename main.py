@@ -210,17 +210,6 @@ async def get_analytics(payload: Dict[str, Any] = Depends(verify_admin_token)):
         logger.error(f"Analytics error: {str(e)}")
         raise HTTPException(status_code=500, detail="Analytics unavailable")
 
-@app.post("/admin/approve-transaction")
-async def approve_transaction(
-    payload: Dict[str, Any] = Depends(verify_admin_token),
-    tx_id: str = Body(...)
-):
-    try:
-        supabase.table("transactions").update({"status": "completed"}).eq("id", tx_id).execute()
-        return {"status": "approved", "tx_id": tx_id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error approving transaction: {str(e)}")
-
 # -------- Health Check --------
 @app.get("/health")
 async def health_check():
@@ -356,3 +345,66 @@ async def viber_webhook(request: Request):
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 # --- END OF FILE main.py ---
+@app.post("/admin/approve-transaction")
+async def approve_transaction(
+    request: Request,
+    payload: Dict[str, Any] = Depends(verify_admin_token),
+    tx_id: str = Body(...)
+):
+    """
+    Approves a pending transaction and notifies the user via Viber.
+    - Requires admin authentication.
+    - Fetches the transaction and related user info.
+    - Updates transaction status from 'pending' to 'completed'.
+    - Sends a confirmation message to the user on Viber.
+    """
+    try:
+        # 1. Fetch transaction and related user's viber_id in a single query
+        # This assumes a foreign key relationship exists from transactions.user_id to viber_users.id
+        tx_res = supabase.table("transactions").select("*, viber_users(viber_id)").eq("id", tx_id).maybe_single().execute()
+        
+        if not tx_res.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+            
+        transaction = tx_res.data
+        
+        # 2. Validate transaction status
+        if transaction.get("status") != "pending":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Transaction is not pending. Current status: {transaction.get('status')}")
+
+        # 3. Update transaction status in the database
+        update_res = supabase.table("transactions").update({"status": "completed"}).eq("id", tx_id).execute()
+        if not update_res.data:
+             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update transaction status")
+
+        # 4. Send notification to the user via Viber
+        user_info = transaction.get("viber_users")
+        notification_sent = False
+        if user_info and user_info.get("viber_id"):
+            viber_id = user_info["viber_id"]
+            amount = transaction.get("amount")
+            tx_type = transaction.get("type")
+            tx_action_text = "ငွေသွင်းခြင်း" if tx_type == "deposit" else "ငွေထုတ်ခြင်း"
+            
+            notification_message = (
+                f"✅ သင်၏ တောင်းဆိုမှု အောင်မြင်ပါသည်။\n\n"
+                f"Transaction ID: {transaction['id']}\n"
+                f"အမျိုးအစား: {tx_action_text}\n"
+                f"ပမာဏ: {amount} MMK"
+            )
+            
+            http_client = request.app.state.httpx_client
+            await send_viber_message(http_client, viber_id, notification_message)
+            logger.info(f"Sent approval notification for tx_id {tx_id} to viber_id {viber_id}")
+            notification_sent = True
+        else:
+            logger.warning(f"Could not find viber_id for tx_id {tx_id}. Notification not sent.")
+
+        return {"status": "approved", "tx_id": tx_id, "notification_sent": notification_sent}
+
+    except HTTPException as e:
+        # Re-raise HTTP exceptions to let FastAPI handle them
+        raise e
+    except Exception as e:
+        logger.error(f"Error approving transaction {tx_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred: {str(e)}")
