@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>YGN Real Estate Admin Panel</title>
+  <title>Admin Panel</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -20,14 +19,14 @@
       border-radius: 12px;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
       padding: 2rem;
-      max-width: 420px;
+      max-width: 480px;
       width: 100%;
     }
     h1 {
       text-align: center;
       color: #111827;
     }
-    input, button {
+    input, button, select {
       width: 100%;
       margin-top: 1rem;
       padding: 0.8rem;
@@ -35,7 +34,7 @@
       font-size: 1rem;
       box-sizing: border-box;
     }
-    input {
+    input, select {
       border: 1px solid #d1d5db;
     }
     button {
@@ -72,7 +71,7 @@
       background: #f9fafb;
       padding: 1rem;
       border-radius: 8px;
-      max-height: 250px;
+      max-height: 300px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
@@ -87,30 +86,42 @@
       margin-top: 1rem;
       display: none;
     }
+    .tx-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .tx-btn:hover {
+      background: #059669;
+    }
   </style>
 </head>
 <body>
   <div id="app">
-    <h1>Admin Login</h1>
+    <h1>Admin Login</h1><div id="authSection">
+  <input type="email" id="email" placeholder="Email" autocomplete="email" />
+  <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
+  <button id="loginBtn">Log In</button>
+  <div id="status"></div>
+</div>
 
-    <div id="authSection">
-      <input type="email" id="email" placeholder="Email" autocomplete="email" />
-      <input type="password" id="password" placeholder="Password" autocomplete="current-password" />
-      <button id="loginBtn">Log In</button>
-      <div id="status"></div>
-    </div>
+<div id="adminPanel">
+  <p>✅ Logged in as Admin</p>
+  <button id="fetchUsersBtn">Fetch Admin Users</button>
+  <button id="fetchPaymentsBtn">Summary: Payments</button>
+  <button id="fetchTxBtn">Fetch Transactions</button>
+  <pre id="resultBox">No data loaded yet.</pre>
+  <button id="logoutBtn">Log Out</button>
+</div>
 
-    <div id="adminPanel">
-      <p>✅ Logged in as Admin</p>
-      <button id="fetchUsersBtn">Fetch Admin Users</button>
-      <pre id="resultBox">No data loaded yet.</pre>
-      <button id="logoutBtn">Log Out</button>
-    </div>
+<div id="toast" class="toast"></div>
 
-    <div id="toast" class="toast"></div>
-  </div>
-
-  <script>
+  </div>  <script>
     const loginBtn = document.getElementById("loginBtn");
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
@@ -119,6 +130,8 @@
     const adminPanel = document.getElementById("adminPanel");
     const logoutBtn = document.getElementById("logoutBtn");
     const fetchUsersBtn = document.getElementById("fetchUsersBtn");
+    const fetchPaymentsBtn = document.getElementById("fetchPaymentsBtn");
+    const fetchTxBtn = document.getElementById("fetchTxBtn");
     const resultBox = document.getElementById("resultBox");
     const toast = document.getElementById("toast");
 
@@ -126,45 +139,33 @@
       toast.textContent = msg;
       toast.style.background = success ? '#16a34a' : '#dc2626';
       toast.style.display = 'block';
-      setTimeout(() => {
-        toast.style.display = 'none';
-      }, 3000);
+      setTimeout(() => toast.style.display = 'none', 3000);
     };
 
     const checkLogin = () => {
       const token = localStorage.getItem("access_token");
-      if (token) {
-        authSection.style.display = "none";
-        adminPanel.style.display = "block";
-        statusDiv.textContent = "";
-      } else {
-        authSection.style.display = "block";
-        adminPanel.style.display = "none";
-      }
+      authSection.style.display = token ? "none" : "block";
+      adminPanel.style.display = token ? "block" : "none";
+      statusDiv.textContent = "";
     };
 
     loginBtn.addEventListener("click", async () => {
       const email = emailInput.value.trim();
       const password = passwordInput.value.trim();
       statusDiv.textContent = "";
-
       if (!email || !password) {
         statusDiv.textContent = "📌 Email နဲ့ Password ရိုက်ထည့်ပါ။";
         return;
       }
-
       loginBtn.disabled = true;
       statusDiv.textContent = "🔐 Logging in...";
-
       try {
         const res = await fetch("/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-
         const data = await res.json();
-
         if (res.ok && data.access_token) {
           localStorage.setItem("access_token", data.access_token);
           showToast("🎉 Login success");
@@ -187,35 +188,77 @@
     });
 
     fetchUsersBtn.addEventListener("click", async () => {
+      await fetchAndDisplay("/admin/users");
+    });
+
+    fetchPaymentsBtn.addEventListener("click", async () => {
+      await fetchAndDisplay("/payments/summary");
+    });
+
+    fetchTxBtn.addEventListener("click", async () => {
       const token = localStorage.getItem("access_token");
-      if (!token) {
-        resultBox.textContent = "❌ Not logged in.";
-        return;
-      }
-
-      resultBox.textContent = "📦 Loading users...";
-
+      if (!token) return showToast("Not logged in", false);
+      resultBox.textContent = "📦 Loading transactions...";
       try {
-        const res = await fetch("/admin/users", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const res = await fetch("/admin/analytics", {
+          headers: { Authorization: `Bearer ${token}` },
         });
+        const stats = await res.json();
 
-        const data = await res.json();
+        const txRes = await fetch("/payments/summary", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const txData = await txRes.json();
 
-        if (!res.ok) {
-          resultBox.textContent = `❌ Failed: ${data.detail || res.statusText}`;
-          return;
-        }
+        resultBox.innerHTML = `Total Transactions: ${txData.total_transactions}\nDeposit: ${txData.total_deposit_amount} MMK\nWithdraw: ${txData.total_withdraw_amount} MMK\n`;
 
-        resultBox.textContent = JSON.stringify(data, null, 2);
+        const txList = txData.transactions || [];
+        txList.forEach(tx => {
+          const div = document.createElement("div");
+          div.innerHTML = `🔄 ${tx.type}: ${tx.amount} MMK - Status: ${tx.status}`;
+          if (tx.status === "pending") {
+            const btn = document.createElement("button");
+            btn.className = "tx-btn";
+            btn.textContent = "✅ Approve";
+            btn.onclick = async () => {
+              const res = await fetch("/admin/approve-transaction", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ tx_id: tx.id })
+              });
+              if (res.ok) {
+                showToast("Transaction approved");
+                btn.disabled = true;
+                btn.textContent = "Approved ✔️";
+              } else {
+                showToast("Failed to approve", false);
+              }
+            };
+            div.appendChild(btn);
+          }
+          resultBox.appendChild(div);
+        });
       } catch (err) {
-        resultBox.textContent = "❌ Network error. Try again.";
+        resultBox.textContent = "❌ Network error.";
       }
     });
 
+    async function fetchAndDisplay(endpoint) {
+      const token = localStorage.getItem("access_token");
+      if (!token) return showToast("Not logged in", false);
+      resultBox.textContent = `Loading ${endpoint}...`;
+      try {
+        const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        resultBox.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        resultBox.textContent = "❌ Network error.";
+      }
+    }
+
     checkLogin();
-  </script>
-</body>
+  </script></body>
 </html>
