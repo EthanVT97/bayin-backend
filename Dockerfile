@@ -1,38 +1,23 @@
-# Use Python 3.11 slim image
+# ────────────── Base Python ──────────────
 FROM python:3.11-slim
 
-# Set working directory
+# ────────────── Working Directory ──────────────
 WORKDIR /app
 
-# Install system dependencies
+# ────────────── System Dependencies ──────────────
 RUN apt-get update && apt-get install -y \
-    gcc \
-    curl \
-    libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential gcc curl && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# ────────────── Copy Code ──────────────
+COPY . /app
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# ────────────── Install Dependencies ──────────────
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
-
-# Create logs directory
-RUN mkdir -p logs
-
-# Create non-root user for security
-RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
+# ────────────── Expose Port ──────────────
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Start command
-CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:8000", "--timeout", "120"]
+# ────────────── Entrypoint ──────────────
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
