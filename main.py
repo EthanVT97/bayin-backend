@@ -101,7 +101,6 @@ security = HTTPBearer()
 # -------------------- Lifespan Event --------------------
 @app.on_event("startup")
 async def startup_event():
-    # Test Supabase connection
     try:
         res = await asyncio.to_thread(lambda: supabase.table("viber_users").select("id").limit(1).execute())
         logger.info(f"Supabase connected: {res}")
@@ -147,7 +146,6 @@ async def get_admin_user_by_email(email: str) -> Optional[Dict[str, Any]]:
 # -------------------- Viber Signature Verification --------------------
 def verify_viber_signature(body: bytes, signature: str) -> bool:
     if not VIBER_WEBHOOK_SECRET:
-        # If no secret configured, skip signature verification
         logger.warning("VIBER_WEBHOOK_SECRET not configured; skipping signature verification")
         return True
     expected = hmac.new(VIBER_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
@@ -171,6 +169,10 @@ async def send_viber_message(client: httpx.AsyncClient, receiver_id: str, messag
         logger.error(f"Failed to send Viber message to {receiver_id}: {e}")
 
 # -------------------- API Routes --------------------
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 @app.post("/auth/login")
 async def admin_login(payload: Dict[str, str]):
@@ -204,7 +206,6 @@ async def approve_transaction(
     if not tx_id:
         raise HTTPException(status_code=400, detail="tx_id is required")
 
-    # Check if transaction exists and is pending
     res = await asyncio.to_thread(lambda: supabase.table("transactions")
                                  .select("*").eq("id", tx_id).maybe_single().execute())
     tx = res.data if res else None
@@ -213,7 +214,6 @@ async def approve_transaction(
     if tx["status"] != "pending":
         raise HTTPException(status_code=400, detail="Transaction already processed")
 
-    # Update transaction status to approved
     await asyncio.to_thread(lambda: supabase.table("transactions")
                            .update({"status": "approved"})
                            .eq("id", tx_id)
@@ -231,17 +231,6 @@ async def get_admin_users(token_data: Dict[str, Any] = Depends(verify_jwt_token)
 
 @app.get("/payments/summary")
 async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token)):
-    # Aggregate sums of deposits and withdrawals and count transactions
-    query = """
-    SELECT
-      COUNT(*) AS total_transactions,
-      SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END) AS total_deposit_amount,
-      SUM(CASE WHEN type = 'withdraw' THEN amount ELSE 0 END) AS total_withdraw_amount
-    FROM transactions
-    """
-    res = await asyncio.to_thread(lambda: supabase.rpc("execute_sql", {"sql": query}).execute())
-    # If supabase.rpc not available, use normal supabase query with groupings
-    # For simplicity, do multiple queries:
     total_tx_res = await asyncio.to_thread(lambda: supabase.table("transactions").select("id", count="exact").execute())
     deposit_sum_res = await asyncio.to_thread(lambda: supabase.table("transactions").select("amount").eq("type", "deposit").execute())
     withdraw_sum_res = await asyncio.to_thread(lambda: supabase.table("transactions").select("amount").eq("type", "withdraw").execute())
@@ -250,7 +239,6 @@ async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token
     total_deposit_amount = sum(tx["amount"] for tx in deposit_sum_res.data) if deposit_sum_res else 0
     total_withdraw_amount = sum(tx["amount"] for tx in withdraw_sum_res.data) if withdraw_sum_res else 0
 
-    # Also fetch recent transactions (last 20)
     recent_res = await asyncio.to_thread(lambda: supabase.table("transactions")
                                         .select("*")
                                         .order("created_at", desc=True)
@@ -267,12 +255,7 @@ async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token
 
 @app.get("/admin/analytics")
 async def admin_analytics(token_data: Dict[str, Any] = Depends(verify_jwt_token)):
-    # For demonstration, reuse payments_summary data
     return await payments_summary(token_data)
-    
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
 
 @app.post("/viber-webhook")
 async def viber_webhook(request: Request):
@@ -305,4 +288,19 @@ async def viber_webhook(request: Request):
         if event == "message":
             message = data.get("message", {})
             if message.get("type") != "text":
-                await send_viber_message(http_client, viber_id, "⚠️ ကျေးဇူးပြု၍ စာသားမက်ဆေ့ချ်သာ ပေးပို့ပါ
+                await send_viber_message(http_client, viber_id, "⚠️ ကျေးဇူးပြု၍ စာသားမက်ဆေ့ချ်သာ ပေးပို့ပါ။")
+                return {"status": "ok"}
+
+            text = message.get("text", "").strip()
+            # Insert message handling logic here...
+            await send_viber_message(http_client, viber_id, f"သင်ပေးပို့ထားသော စာသားမှာ: {text}")
+            return {"status": "ok"}
+
+        logger.warning(f"Unhandled Viber event type: {event}")
+        return {"status": "ignored"}
+
+    except Exception as e:
+        logger.error(f"Error processing Viber webhook: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+    finally:
+        await http_client.aclose()
