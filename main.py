@@ -1,3 +1,5 @@
+--- START OF FILE main (1).py ---
+
 # --- START OF FILE main.py ---
 
 from fastapi import FastAPI, Request, HTTPException, Depends, Header, Body, status
@@ -207,6 +209,17 @@ async def get_analytics(payload: Dict[str, Any] = Depends(verify_admin_token)):
     except Exception as e:
         logger.error(f"Analytics error: {str(e)}")
         raise HTTPException(status_code=500, detail="Analytics unavailable")
+
+@app.post("/admin/approve-transaction")
+async def approve_transaction(
+    payload: Dict[str, Any] = Depends(verify_admin_token),
+    tx_id: str = Body(...)
+):
+    try:
+        supabase.table("transactions").update({"status": "completed"}).eq("id", tx_id).execute()
+        return {"status": "approved", "tx_id": tx_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error approving transaction: {str(e)}")
 
 # -------- Health Check --------
 @app.get("/health")
