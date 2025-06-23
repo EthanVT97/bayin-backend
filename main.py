@@ -13,7 +13,7 @@ import jwt
 from fastapi import (
     FastAPI, Request, HTTPException, Depends, status
 )
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -44,7 +44,7 @@ if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_JWT_SECRET, VIBER_TOKEN]):
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -------------------- Constants --------------------
-ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "").split(",")  # comma separated admin emails
+ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "").split(",")
 if not ADMIN_EMAILS or ADMIN_EMAILS == [""]:
     logger.warning("No admin emails configured in ADMIN_EMAILS env variable.")
 
@@ -85,17 +85,17 @@ app = FastAPI(title="YGN Real Estate Bot Admin API", version="1.0.0")
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In prod, replace with specific domains
+    allow_origins=["*"],  # production မှာ domain specify လုပ်ရန်
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Static files for admin frontend
+# Static files for admin frontend (if exists)
 if os.path.isdir("admin"):
     app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
 
-# HTTP Bearer for JWT auth
+# HTTP Bearer security for JWT token validation
 security = HTTPBearer()
 
 # -------------------- Lifespan Event --------------------
@@ -108,7 +108,16 @@ async def startup_event():
         logger.error(f"Supabase connection failed: {e}")
         raise
 
-# -------------------- JWT Token Utilities --------------------
+# -------------------- Root and Health Endpoints --------------------
+@app.get("/")
+async def root():
+    return {"message": "Hello from YGN Real Estate Bot API"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+# -------------------- JWT Token Utils --------------------
 def create_jwt_token(email: str) -> str:
     payload = {
         "email": email,
@@ -136,7 +145,7 @@ async def verify_jwt_token(
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-# -------------------- Helper: Verify Admin Credentials --------------------
+# -------------------- Admin User Helper --------------------
 async def get_admin_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     res = await asyncio.to_thread(lambda: supabase.table("admin_users").select("*").eq("email", email).maybe_single().execute())
     if res and res.data:
@@ -169,10 +178,6 @@ async def send_viber_message(client: httpx.AsyncClient, receiver_id: str, messag
         logger.error(f"Failed to send Viber message to {receiver_id}: {e}")
 
 # -------------------- API Routes --------------------
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
 
 @app.post("/auth/login")
 async def admin_login(payload: Dict[str, str]):
@@ -231,14 +236,19 @@ async def get_admin_users(token_data: Dict[str, Any] = Depends(verify_jwt_token)
 
 @app.get("/payments/summary")
 async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token)):
+    # Get total count of transactions
     total_tx_res = await asyncio.to_thread(lambda: supabase.table("transactions").select("id", count="exact").execute())
-    deposit_sum_res = await asyncio.to_thread(lambda: supabase.table("transactions").select("amount").eq("type", "deposit").execute())
-    withdraw_sum_res = await asyncio.to_thread(lambda: supabase.table("transactions").select("amount").eq("type", "withdraw").execute())
-    
     total_transactions = total_tx_res.count if total_tx_res else 0
-    total_deposit_amount = sum(tx["amount"] for tx in deposit_sum_res.data) if deposit_sum_res else 0
-    total_withdraw_amount = sum(tx["amount"] for tx in withdraw_sum_res.data) if withdraw_sum_res else 0
 
+    # Sum of deposits
+    deposit_res = await asyncio.to_thread(lambda: supabase.rpc("sum_amount_by_type", {"type_in": ["deposit"]}))
+    total_deposit_amount = deposit_res.data if deposit_res and deposit_res.data else 0
+
+    # Sum of withdrawals
+    withdraw_res = await asyncio.to_thread(lambda: supabase.rpc("sum_amount_by_type", {"type_in": ["withdraw"]}))
+    total_withdraw_amount = withdraw_res.data if withdraw_res and withdraw_res.data else 0
+
+    # Recent transactions (last 20)
     recent_res = await asyncio.to_thread(lambda: supabase.table("transactions")
                                         .select("*")
                                         .order("created_at", desc=True)
@@ -250,57 +260,222 @@ async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token
         "total_transactions": total_transactions,
         "total_deposit_amount": total_deposit_amount,
         "total_withdraw_amount": total_withdraw_amount,
-        "transactions": recent_txs
+        "recent_transactions": recent_txs
     }
-
-@app.get("/admin/analytics")
-async def admin_analytics(token_data: Dict[str, Any] = Depends(verify_jwt_token)):
-    return await payments_summary(token_data)
 
 @app.post("/viber-webhook")
 async def viber_webhook(request: Request):
     http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=10.0)
     try:
         body_bytes = await request.body()
-        viber_signature = request.headers.get("X-Viber-Content-Signature", "")
-        if not verify_viber_signature(body_bytes, viber_signature):
-            logger.warning("Invalid Viber webhook signature")
-            raise HTTPException(status_code=401, detail="Invalid signature")
+        viber_signature = request.headers.get("X-Viber-Content-Signature")
+    if not viber_signature:
+        logger.warning("Viber webhook called without signature.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Signature missing")
 
-        data = json.loads(body_bytes)
-        event = data.get("event")
-        logger.info(f"Received Viber event: {event}")
+    if not verify_viber_signature(body_bytes, viber_signature):
+        logger.warning("Invalid Viber signature received.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
 
-        if event == "webhook":
-            return {"status": "ok", "message": "Webhook configured"}
+    data = json.loads(body_bytes)
+    event_type = data.get("event")
+    user_id = data.get("sender", {}).get("id") or data.get("user", {}).get("id")
 
-        viber_id = data.get("sender", {}).get("id") or data.get("user", {}).get("id")
-        if not viber_id:
-            logger.error("Viber ID missing in webhook payload")
-            return JSONResponse(status_code=400, content={"error": "Viber ID missing"})
+    if not user_id:
+        # Some events like 'webhook' might not have a user_id. We can safely ignore them.
+        logger.info(f"Received Viber event '{event_type}' without a user_id. Skipping.")
+        return JSONResponse(content={}, status_code=200)
 
-        if event == "conversation_started":
-            await send_viber_message(http_client, viber_id, "မင်္ဂလာပါ။ Bot မှ ကြိုဆိုပါတယ်။\n\nကျေးဇူးပြု၍ သင့်အကောင့်နံပါတ် (account ID) ကိုထည့်ပေးပါ။")
-            await asyncio.to_thread(lambda: supabase.table("viber_users").upsert(
-                {"viber_id": viber_id, "state": UserState.AWAITING_ACCOUNT_ID}, on_conflict="viber_id").execute())
-            return {"status": "ok"}
+    # Basic rate limiting
+    if not rate_limiter.is_allowed(user_id):
+        logger.warning(f"Rate limit exceeded for user {user_id}. Ignoring request.")
+        return JSONResponse(content={}, status_code=200)
 
-        if event == "message":
-            message = data.get("message", {})
-            if message.get("type") != "text":
-                await send_viber_message(http_client, viber_id, "⚠️ ကျေးဇူးပြု၍ စာသားမက်ဆေ့ချ်သာ ပေးပို့ပါ။")
-                return {"status": "ok"}
+    logger.info(f"Received Viber event '{event_type}' for user {user_id}")
 
-            text = message.get("text", "").strip()
-            # Insert message handling logic here...
-            await send_viber_message(http_client, viber_id, f"သင်ပေးပို့ထားသော စာသားမှာ: {text}")
-            return {"status": "ok"}
+    if event_type == "message":
+        await handle_message(http_client, data)
+    elif event_type == "subscribed":
+        await handle_subscribed(http_client, data)
+    elif event_type == "conversation_started":
+        await handle_conversation_started(http_client, data)
+    elif event_type == "unsubscribed":
+        await handle_unsubscribed(data)
+    else:
+        logger.info(f"Ignoring unhandled Viber event type: {event_type}")
 
-        logger.warning(f"Unhandled Viber event type: {event}")
-        return {"status": "ignored"}
-
-    except Exception as e:
-        logger.error(f"Error processing Viber webhook: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+    return JSONResponse(content={}, status_code=200)
     finally:
         await http_client.aclose()
+
+# -------------------- Viber Logic Helpers --------------------
+
+async def get_viber_user(viber_id: str) -> Optional[Dict[str, Any]]:
+    """Fetches user data from Supabase using their Viber ID."""
+    try:
+        res = await asyncio.to_thread(
+            lambda: supabase.table("viber_users").select("*").eq("viber_id", viber_id).maybe_single().execute()
+        )
+        return res.data if res and res.data else None
+    except Exception as e:
+        logger.error(f"Error fetching Viber user {viber_id}: {e}")
+        return None
+
+async def handle_subscribed(client: httpx.AsyncClient, data: Dict[str, Any]):
+    """Handles the 'subscribed' event when a user subscribes to the bot."""
+    user = data.get("user", {})
+    user_id = user.get("id")
+    user_name = user.get("name", "New User")
+
+    if not user_id:
+        return
+
+    logger.info(f"User {user_name} ({user_id}) subscribed.")
+    await asyncio.to_thread(
+        lambda: supabase.table("viber_users")
+            .upsert({"viber_id": user_id, "state": UserState.AWAITING_ACCOUNT_ID}, on_conflict="viber_id")
+            .execute()
+    )
+    await send_viber_message(client, user_id, f"Welcome, {user_name}! To get started, please send your Account ID.")
+
+async def handle_conversation_started(client: httpx.AsyncClient, data: Dict[str, Any]):
+    """
+    Handles the 'conversation_started' event. This is often the first interaction.
+    Note: This event doesn't guarantee the user has subscribed.
+    """
+    user = data.get("user", {})
+    user_id = user.get("id")
+    if not user_id:
+        return
+
+    welcome_message = "Hello! Welcome to the YGN Real Estate Bot.\n\nTo link your account, please send your Account ID."
+    await send_viber_message(client, user_id, welcome_message)
+    # We can create a user entry here if one doesn't exist.
+    await asyncio.to_thread(
+        lambda: supabase.table("viber_users")
+            .upsert({"viber_id": user_id, "state": UserState.AWAITING_ACCOUNT_ID}, on_conflict="viber_id")
+            .execute()
+    )
+
+async def handle_unsubscribed(data: Dict[str, Any]):
+    """Handles the 'unsubscribed' event."""
+    user_id = data.get("user_id")
+    if not user_id:
+        return
+
+    logger.info(f"User {user_id} unsubscribed.")
+    await asyncio.to_thread(
+        lambda: supabase.table("viber_users")
+            .update({"state": "unsubscribed"})
+            .eq("viber_id", user_id)
+            .execute()
+    )
+
+async def handle_message(client: httpx.AsyncClient, data: Dict[str, Any]):
+    """Handles incoming message events from Viber, containing the core bot logic."""
+    sender = data.get("sender", {})
+    user_id = sender.get("id")
+    message = data.get("message", {})
+    text = message.get("text", "").strip()
+
+    if not user_id or not text:
+        logger.warning("Message event missing sender ID or text.")
+        return
+
+    user = await get_viber_user(user_id)
+    if not user:
+        # If user sends a message without being in the DB, treat as a new user.
+        await handle_conversation_started(client, {"user": sender})
+        return
+
+    current_state = user.get("state")
+
+    # State: Awaiting Account ID
+    if current_state == UserState.AWAITING_ACCOUNT_ID:
+        account_id = text
+        await asyncio.to_thread(
+            lambda: supabase.table("viber_users")
+                .update({"account_id": account_id, "state": UserState.MAIN_MENU})
+                .eq("viber_id", user_id)
+                .execute()
+        )
+        main_menu_text = "Thank you. Your account is linked.\n\nWhat would you like to do?\n- Deposit\n- Withdraw\n- Balance"
+        await send_viber_message(client, user_id, main_menu_text)
+
+    # State: Main Menu
+    elif current_state == UserState.MAIN_MENU:
+        text_lower = text.lower()
+        if "deposit" in text_lower:
+            await asyncio.to_thread(
+                lambda: supabase.table("viber_users").update({"state": UserState.AWAITING_DEPOSIT}).eq("viber_id", user_id).execute()
+            )
+            await send_viber_message(client, user_id, "Please enter the amount you wish to deposit.")
+        elif "withdraw" in text_lower:
+            await asyncio.to_thread(
+                lambda: supabase.table("viber_users").update({"state": UserState.AWAITING_WITHDRAW}).eq("viber_id", user_id).execute()
+            )
+            await send_viber_message(client, user_id, "Please enter the amount you wish to withdraw.")
+        elif "balance" in text_lower:
+            await handle_balance_check(client, user)
+        else:
+            await send_viber_message(client, user_id, "Invalid option. Please choose from:\n- Deposit\n- Withdraw\n- Balance")
+
+    # State: Awaiting Deposit Amount
+    elif current_state == UserState.AWAITING_DEPOSIT:
+        await handle_transaction_request(client, user, "deposit", text)
+
+    # State: Awaiting Withdraw Amount
+    elif current_state == UserState.AWAITING_WITHDRAW:
+        await handle_transaction_request(client, user, "withdraw", text)
+
+
+async def handle_balance_check(client: httpx.AsyncClient, user: Dict[str, Any]):
+    """Calculates and sends the user's approved balance."""
+    user_id = user["viber_id"]
+    account_id = user.get("account_id")
+    if not account_id:
+        await send_viber_message(client, user_id, "Error: Account ID not found. Please re-link your account.")
+        await asyncio.to_thread(
+            lambda: supabase.table("viber_users").update({"state": UserState.AWAITING_ACCOUNT_ID}).eq("viber_id", user_id).execute()
+        )
+        return
+
+    txs_res = await asyncio.to_thread(
+        lambda: supabase.table("transactions")
+            .select("amount, type")
+            .eq("account_id", account_id)
+            .eq("status", "approved")
+            .execute()
+    )
+    if not txs_res.data:
+        await send_viber_message(client, user_id, "You have no approved transactions. Your balance is: 0.00")
+        return
+
+    total_deposits = sum(tx['amount'] for tx in txs_res.data if tx['type'] == 'deposit')
+    total_withdrawals = sum(tx['amount'] for tx in txs_res.data if tx['type'] == 'withdraw')
+    balance = total_deposits - total_withdrawals
+    await send_viber_message(client, user_id, f"Your current approved balance is: {balance:,.2f}")
+
+async def handle_transaction_request(client: httpx.AsyncClient, user: Dict[str, Any], tx_type: str, text_amount: str):
+    """Handles a deposit or withdrawal request."""
+    user_id = user["viber_id"]
+    try:
+        amount = float(text_amount)
+        if amount <= 0:
+            raise ValueError("Amount must be positive.")
+
+        await asyncio.to_thread(
+            lambda: supabase.table("transactions").insert({
+                "account_id": user["account_id"],
+                "viber_user_id": user_id,
+                "amount": amount,
+                "type": tx_type,
+                "status": "pending"
+            }).execute()
+        )
+        await asyncio.to_thread(
+            lambda: supabase.table("viber_users").update({"state": UserState.MAIN_MENU}).eq("viber_id", user_id).execute()
+        )
+        await send_viber_message(client, user_id, f"Your {tx_type} request for {amount:,.2f} has been received and is pending approval.")
+    except (ValueError, TypeError):
+        await send_viber_message(client, user_id, "Invalid amount. Please enter a positive number (e.g., 10000).")
