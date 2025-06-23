@@ -269,6 +269,10 @@ async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token
 async def admin_analytics(token_data: Dict[str, Any] = Depends(verify_jwt_token)):
     # For demonstration, reuse payments_summary data
     return await payments_summary(token_data)
+    
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 @app.post("/viber-webhook")
 async def viber_webhook(request: Request):
