@@ -22,6 +22,7 @@ from supabase import create_client, Client
 from passlib.hash import bcrypt
 
 # -------------------- Logging Setup --------------------
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
@@ -30,6 +31,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # -------------------- Environment Variables --------------------
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
@@ -41,9 +43,11 @@ if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_JWT_SECRET, VIBER_TOKEN]):
     raise RuntimeError("Required environment variables are not set.")
 
 # -------------------- Supabase Client --------------------
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -------------------- Constants --------------------
+
 ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "").split(",")
 if not ADMIN_EMAILS or ADMIN_EMAILS == [""]:
     logger.warning("No admin emails configured in ADMIN_EMAILS env variable.")
@@ -53,6 +57,7 @@ JWT_AUDIENCE = "authenticated"
 JWT_EXP_HOURS = 2
 
 # -------------------- Rate Limiter --------------------
+
 class RateLimiter:
     def __init__(self, max_requests: int = 20, window_seconds: int = 60):
         self.max_requests = max_requests
@@ -72,6 +77,7 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 # -------------------- User State --------------------
+
 class UserState:
     AWAITING_ACCOUNT_ID = "AWAITING_ACCOUNT_ID"
     MAIN_MENU = "MAIN_MENU"
@@ -79,13 +85,15 @@ class UserState:
     AWAITING_WITHDRAW = "AWAITING_WITHDRAW"
 
 # -------------------- FastAPI App Setup --------------------
+
 app = FastAPI(title="YGN Real Estate Bot Admin API", version="1.0.0")
 
 # Middleware
+# Note: Use ["*"] for development, but specify actual hosts/origins in production.
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # production မှာ domain specify လုပ်ရန်
+    allow_origins=["*"],  # production á€™á€¾á€¬ domain specify á€œá€¯á€•á€ºá€›á€”á€º
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -99,16 +107,19 @@ if os.path.isdir("admin"):
 security = HTTPBearer()
 
 # -------------------- Lifespan Event --------------------
+
 @app.on_event("startup")
 async def startup_event():
     try:
+        # Check Supabase connection by making a simple request
         res = await asyncio.to_thread(lambda: supabase.table("viber_users").select("id").limit(1).execute())
-        logger.info(f"Supabase connected: {res}")
+        logger.info(f"Supabase connection successful.")
     except Exception as e:
-        logger.error(f"Supabase connection failed: {e}")
+        logger.error(f"Supabase connection failed on startup: {e}")
         raise
 
 # -------------------- Root and Health Endpoints --------------------
+
 @app.get("/")
 async def root():
     return {"message": "Hello from YGN Real Estate Bot API"}
@@ -118,6 +129,7 @@ async def health():
     return {"status": "ok"}
 
 # -------------------- JWT Token Utils --------------------
+
 def create_jwt_token(email: str) -> str:
     payload = {
         "email": email,
@@ -146,13 +158,17 @@ async def verify_jwt_token(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 # -------------------- Admin User Helper --------------------
+
 async def get_admin_user_by_email(email: str) -> Optional[Dict[str, Any]]:
-    res = await asyncio.to_thread(lambda: supabase.table("admin_users").select("*").eq("email", email).maybe_single().execute())
-    if res and res.data:
-        return res.data
-    return None
+    try:
+        res = await asyncio.to_thread(lambda: supabase.table("admin_users").select("*").eq("email", email).maybe_single().execute())
+        return res.data if res and res.data else None
+    except Exception as e:
+        logger.error(f"Error fetching admin user by email {email}: {e}")
+        return None
 
 # -------------------- Viber Signature Verification --------------------
+
 def verify_viber_signature(body: bytes, signature: str) -> bool:
     if not VIBER_WEBHOOK_SECRET:
         logger.warning("VIBER_WEBHOOK_SECRET not configured; skipping signature verification")
@@ -161,6 +177,7 @@ def verify_viber_signature(body: bytes, signature: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 # -------------------- Viber Message Sender --------------------
+
 async def send_viber_message(client: httpx.AsyncClient, receiver_id: str, message_text: str):
     url = "https://chatapi.viber.com/pa/send_message"
     headers = {"X-Viber-Auth-Token": VIBER_TOKEN}
@@ -168,12 +185,14 @@ async def send_viber_message(client: httpx.AsyncClient, receiver_id: str, messag
         "receiver": receiver_id,
         "type": "text",
         "text": message_text,
-        "min_api_version": 1
+        "min_api_version": 7 # Use a more recent API version
     }
     try:
         resp = await client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
         logger.info(f"Sent Viber message to {receiver_id}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Failed to send Viber message to {receiver_id}. Status: {e.response.status_code}, Response: {e.response.text}")
     except Exception as e:
         logger.error(f"Failed to send Viber message to {receiver_id}: {e}")
 
@@ -184,23 +203,23 @@ async def admin_login(payload: Dict[str, str]):
     email = payload.get("email", "").strip().lower()
     password = payload.get("password", "")
     if not email or not password:
-        raise HTTPException(status_code=400, detail="Email and password are required")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email and password are required")
 
     user = await get_admin_user_by_email(email)
     if not user:
         logger.warning(f"Admin login failed: user not found for email {email}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
     if not bcrypt.verify(password, user["password_hash"]):
         logger.warning(f"Admin login failed: incorrect password for {email}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     if email not in ADMIN_EMAILS:
         logger.warning(f"Unauthorized admin login attempt by {email}")
-        raise HTTPException(status_code=403, detail="Unauthorized")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized")
 
     token = create_jwt_token(email)
-    return {"access_token": token}
+    return {"access_token": token, "token_type": "bearer"}
 
 @app.post("/admin/approve-transaction")
 async def approve_transaction(
@@ -209,15 +228,15 @@ async def approve_transaction(
 ):
     tx_id = payload.get("tx_id")
     if not tx_id:
-        raise HTTPException(status_code=400, detail="tx_id is required")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="tx_id is required")
 
     res = await asyncio.to_thread(lambda: supabase.table("transactions")
                                  .select("*").eq("id", tx_id).maybe_single().execute())
     tx = res.data if res else None
     if not tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
     if tx["status"] != "pending":
-        raise HTTPException(status_code=400, detail="Transaction already processed")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaction already processed")
 
     await asyncio.to_thread(lambda: supabase.table("transactions")
                            .update({"status": "approved"})
@@ -229,10 +248,9 @@ async def approve_transaction(
 
 @app.get("/admin/users")
 async def get_admin_users(token_data: Dict[str, Any] = Depends(verify_jwt_token)):
-    res = await asyncio.to_thread(lambda: supabase.table("admin_users")
-                                 .select("email").execute())
+    res = await asyncio.to_thread(lambda: supabase.table("admin_users").select("id, email, created_at").execute())
     users = res.data if res else []
-    return {"admin_users": [u["email"] for u in users]}
+    return {"admin_users": users}
 
 @app.get("/payments/summary")
 async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token)):
@@ -241,11 +259,11 @@ async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token
     total_transactions = total_tx_res.count if total_tx_res else 0
 
     # Sum of deposits
-    deposit_res = await asyncio.to_thread(lambda: supabase.rpc("sum_amount_by_type", {"type_in": ["deposit"]}))
+    deposit_res = await asyncio.to_thread(lambda: supabase.rpc("sum_amount_by_type", {"type_in": "deposit"}))
     total_deposit_amount = deposit_res.data if deposit_res and deposit_res.data else 0
 
     # Sum of withdrawals
-    withdraw_res = await asyncio.to_thread(lambda: supabase.rpc("sum_amount_by_type", {"type_in": ["withdraw"]}))
+    withdraw_res = await asyncio.to_thread(lambda: supabase.rpc("sum_amount_by_type", {"type_in": "withdraw"}))
     total_withdraw_amount = withdraw_res.data if withdraw_res and withdraw_res.data else 0
 
     # Recent transactions (last 20)
@@ -265,46 +283,46 @@ async def payments_summary(token_data: Dict[str, Any] = Depends(verify_jwt_token
 
 @app.post("/viber-webhook")
 async def viber_webhook(request: Request):
-    http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=10.0)
+    http_client = httpx.AsyncClient(timeout=10.0)
     try:
         body_bytes = await request.body()
         viber_signature = request.headers.get("X-Viber-Content-Signature")
-    if not viber_signature:
-        logger.warning("Viber webhook called without signature.")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Signature missing")
+        if not viber_signature:
+            logger.warning("Viber webhook called without signature.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Signature missing")
 
-    if not verify_viber_signature(body_bytes, viber_signature):
-        logger.warning("Invalid Viber signature received.")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
+        if not verify_viber_signature(body_bytes, viber_signature):
+            logger.warning("Invalid Viber signature received.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid signature")
 
-    data = json.loads(body_bytes)
-    event_type = data.get("event")
-    user_id = data.get("sender", {}).get("id") or data.get("user", {}).get("id")
+        data = json.loads(body_bytes)
+        event_type = data.get("event")
+        user_id = data.get("sender", {}).get("id") or data.get("user", {}).get("id")
 
-    if not user_id:
-        # Some events like 'webhook' might not have a user_id. We can safely ignore them.
-        logger.info(f"Received Viber event '{event_type}' without a user_id. Skipping.")
+        if not user_id:
+            # Some events like 'webhook' might not have a user_id. We can safely ignore them.
+            logger.info(f"Received Viber event '{event_type}' without a user_id. Skipping.")
+            return JSONResponse(content={}, status_code=200)
+
+        # Basic rate limiting
+        if not rate_limiter.is_allowed(user_id):
+            logger.warning(f"Rate limit exceeded for user {user_id}. Ignoring request.")
+            return JSONResponse(content={}, status_code=200)
+
+        logger.info(f"Received Viber event '{event_type}' for user {user_id}")
+
+        if event_type == "message":
+            await handle_message(http_client, data)
+        elif event_type == "subscribed":
+            await handle_subscribed(http_client, data)
+        elif event_type == "conversation_started":
+            await handle_conversation_started(http_client, data)
+        elif event_type == "unsubscribed":
+            await handle_unsubscribed(data)
+        else:
+            logger.info(f"Ignoring unhandled Viber event type: {event_type}")
+
         return JSONResponse(content={}, status_code=200)
-
-    # Basic rate limiting
-    if not rate_limiter.is_allowed(user_id):
-        logger.warning(f"Rate limit exceeded for user {user_id}. Ignoring request.")
-        return JSONResponse(content={}, status_code=200)
-
-    logger.info(f"Received Viber event '{event_type}' for user {user_id}")
-
-    if event_type == "message":
-        await handle_message(http_client, data)
-    elif event_type == "subscribed":
-        await handle_subscribed(http_client, data)
-    elif event_type == "conversation_started":
-        await handle_conversation_started(http_client, data)
-    elif event_type == "unsubscribed":
-        await handle_unsubscribed(data)
-    else:
-        logger.info(f"Ignoring unhandled Viber event type: {event_type}")
-
-    return JSONResponse(content={}, status_code=200)
     finally:
         await http_client.aclose()
 
@@ -333,7 +351,7 @@ async def handle_subscribed(client: httpx.AsyncClient, data: Dict[str, Any]):
     logger.info(f"User {user_name} ({user_id}) subscribed.")
     await asyncio.to_thread(
         lambda: supabase.table("viber_users")
-            .upsert({"viber_id": user_id, "state": UserState.AWAITING_ACCOUNT_ID}, on_conflict="viber_id")
+            .upsert({"viber_id": user_id, "state": UserState.AWAITING_ACCOUNT_ID, "viber_name": user_name}, on_conflict="viber_id")
             .execute()
     )
     await send_viber_message(client, user_id, f"Welcome, {user_name}! To get started, please send your Account ID.")
@@ -428,7 +446,6 @@ async def handle_message(client: httpx.AsyncClient, data: Dict[str, Any]):
     elif current_state == UserState.AWAITING_WITHDRAW:
         await handle_transaction_request(client, user, "withdraw", text)
 
-
 async def handle_balance_check(client: httpx.AsyncClient, user: Dict[str, Any]):
     """Calculates and sends the user's approved balance."""
     user_id = user["viber_id"]
@@ -459,23 +476,11 @@ async def handle_balance_check(client: httpx.AsyncClient, user: Dict[str, Any]):
 async def handle_transaction_request(client: httpx.AsyncClient, user: Dict[str, Any], tx_type: str, text_amount: str):
     """Handles a deposit or withdrawal request."""
     user_id = user["viber_id"]
-    try:
-        amount = float(text_amount)
-        if amount <= 0:
-            raise ValueError("Amount must be positive.")
+    account_id = user.get("account_id")
 
+    # This is a safeguard; a user should not be in this state without an account_id.
+    if not account_id:
+        logger.error(f"User {user_id} in state AWAITING_{tx_type.upper()} but has no account_id.")
+        await send_viber_message(client, user_id, "An internal error occurred. We could not find your Account ID. Please start over by sending your Account ID again.")
         await asyncio.to_thread(
-            lambda: supabase.table("transactions").insert({
-                "account_id": user["account_id"],
-                "viber_user_id": user_id,
-                "amount": amount,
-                "type": tx_type,
-                "status": "pending"
-            }).execute()
-        )
-        await asyncio.to_thread(
-            lambda: supabase.table("viber_users").update({"state": UserState.MAIN_MENU}).eq("viber_id", user_id).execute()
-        )
-        await send_viber_message(client, user_id, f"Your {tx_type} request for {amount:,.2f} has been received and is pending approval.")
-    except (ValueError, TypeError):
-        await send_viber_message(client, user_id, "Invalid amount. Please enter a positive number (e.g., 10000).")
+ 
