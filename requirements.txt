@@ -1,8 +1,9 @@
 fastapi
 uvicorn
-openai>=1.3.0
-supabase
-requests
 python-dotenv
-PyJWT
+supabase
+openai
+pyjwt
 bcrypt
+requests
+httpx
