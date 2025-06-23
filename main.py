@@ -1,7 +1,3 @@
---- START OF FILE main (1).py ---
-
-# --- START OF FILE main.py ---
-
 from fastapi import FastAPI, Request, HTTPException, Depends, Header, Body, status
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
