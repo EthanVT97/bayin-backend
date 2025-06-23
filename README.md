@@ -1,252 +1,402 @@
-YGN Bot Service - Viber ဘော့တ်
+# YGN Bot Service - Viber Banking Bot
 
-ဒီ project ဟာ FastAPI ကို အသုံးပြုပြီးတည်ဆောက်ထားတဲ့ Viber Bot တစ်ခုဖြစ်ပါတယ်။ ငွေသွင်း/ငွေထုတ် တောင်းဆိုမှုတွေကို stateful conversation logic နဲ့ကိုင်တွယ်ပေးနိုင်ပြီး၊ Admin တွေအတွက် JWT authentication ပါဝင်တဲ့ dashboard တစ်ခုလည်း ပါရှိပါတယ်။ Database အတွက် Supabase ကို အသုံးပြုထားပါတယ်။
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-အဓိက Features များ
+A production-ready Viber bot service built with FastAPI for handling banking transactions (deposits/withdrawals) with stateful conversation logic, JWT-authenticated admin dashboard, and Supabase integration.
 
-Viber Bot Integration: ငွေသွင်း၊ ငွေထုတ် လုပ်ငန်းစဥ်များအတွက် အဆင့်လိုက်တုံ့ပြန်မှု (Stateful Logic)။
+## 🚀 Features
 
-Admin Panel: Admin များအတွက် Login, Analytics နှင့် Transaction Approval ပြုလုပ်နိုင်သော Endpoint များ။
+- **Viber Bot Integration**: Stateful conversation flows for deposit/withdrawal operations
+- **Admin Dashboard**: JWT-secured admin panel with analytics and transaction approval
+- **Database Integration**: Supabase (PostgreSQL) for persistent data storage
+- **Security**: Webhook signature verification, JWT authentication, rate limiting
+- **Production Ready**: Docker support, health checks, comprehensive logging
+- **Multi-language Support**: Myanmar Unicode support for Viber messages
 
-JWT Authentication: Admin Endpoint များကို HS256 JWT ဖြင့် လုံခြုံအောင်ပြုလုပ်ထားခြင်း။
+## 🏗️ Architecture
 
-Supabase Integration: User data, transaction logs များကို Supabase (PostgreSQL) တွင် သိမ်းဆည်းခြင်း။
+```
+├── main.py              # FastAPI application entry
+├── routers/            # API route handlers
+├── models/             # Database models
+├── services/           # Business logic
+├── utils/              # Helper functions
+├── static/             # Admin dashboard assets
+└── templates/          # HTML templates
+```
 
-Rate Limiting: Request များ အလွန်အကျွံဝင်လာခြင်းကို ကာကွယ်ပေးခြင်း။
+## 🛠️ Tech Stack
 
-Health Check: Service ၏ ကျန်းမာရေးအခြေအနေကို စစ်ဆေးနိုင်သော /health endpoint။
+- **Backend**: Python 3.8+, FastAPI, Uvicorn
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: PyJWT, bcrypt
+- **HTTP Client**: HTTPX, Requests
+- **Deployment**: Docker, Render.com, Gunicorn
 
-Webhook Security: Viber မှ ပေးပို့သော request များကို X-Viber-Content-Signature ဖြင့် စစ်ဆေးခြင်း။
+## 📋 Prerequisites
 
-Environment-based Configuration: .env ဖိုင်ဖြင့် လွယ်ကူစွာ setup ပြုလုပ်နိုင်ခြင်း။
+- Python 3.8+
+- Supabase account
+- Viber Bot Token
+- Git
 
-အသုံးပြုထားသော နည်းပညာများ
+## 🚀 Quick Start
 
-Backend: Python 3, FastAPI
+### 1. Clone Repository
 
-Database: Supabase (PostgreSQL)
+```bash
+git clone https://github.com/EthanVT97/bayin-backend.git
+cd bayin-backend
+```
 
-Authentication: PyJWT, bcrypt
+### 2. Environment Setup
 
-API Client: HTTPX, Requests
-
-ASGI Server: Uvicorn
-
-Local မှာ Setup ပြုလုပ်ခြင်း
-၁။ Project ကို Clone ပြုလုပ်ပါ
-Generated bash
-git clone <your-repository-url>
-cd <your-repository-folder>
-
-၂။ Virtual Environment สร้างပြီး Activate လုပ်ပါ
-Generated bash
-# Windows
+```bash
+# Create virtual environment
 python -m venv venv
+
+# Activate virtual environment
+# Windows
 venv\Scripts\activate
-
-# macOS / Linux
-python3 -m venv venv
+# macOS/Linux
 source venv/bin/activate
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
-၃။ requirements.txt ဖိုင်สร้างပါ
 
-သင့် project folder ထဲမှာ requirements.txt ဆိုတဲ့ဖိုင်တစ်ခုဆောက်ပြီး အောက်ပါ dependency များကို ထည့်သွင်းပါ။
-
-Generated txt
-fastapi
-uvicorn[standard]
-supabase
-python-dotenv
-pyjwt
-bcrypt
-httpx
-requests
-gunicorn
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Txt
-IGNORE_WHEN_COPYING_END
-၄။ Dependency များကို Install လုပ်ပါ
-Generated bash
+# Install dependencies
 pip install -r requirements.txt
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
-၅။ Environment Variables (.env) ဖိုင်ပြင်ဆင်ပါ
+```
 
-Project folder ထဲမှာ .env ဆိုတဲ့ ဖိုင်တစ်ခုဆောက်ပြီး အောက်ပါအတိုင်း သင့်ရဲ့ key များကို ဖြည့်စွက်ပါ။
+### 3. Environment Variables
 
-Generated env
-# Supabase
+Create `.env` file:
+
+```env
+# Supabase Configuration
 SUPABASE_URL="https://your-project-ref.supabase.co"
 SUPABASE_KEY="your-supabase-anon-key"
-SUPABASE_JWT_SECRET="your-supabase-jwt-secret" # Supabase > Project Settings > API > JWT Secret
+SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
 
-# Viber
+# Viber Bot Configuration
 VIBER_TOKEN="your-viber-bot-auth-token"
-VIBER_WEBHOOK_SECRET="some-very-strong-secret-string-for-webhook" # လုံခြုံရေးအတွက် ကိုယ်တိုင်สร้างထားတဲ့ စာတန်း
+VIBER_WEBHOOK_SECRET="your-webhook-signature-secret"
 
-# OpenAI (Optional)
-# OPENAI_API_KEY="your-openai-key"
+# Optional: OpenAI Integration
+OPENAI_API_KEY="your-openai-api-key"
 
 # Environment
 ENVIRONMENT="development"
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Env
-IGNORE_WHEN_COPYING_END
-၆။ Supabase Database Setup
+DEBUG="true"
 
-Supabase project ထဲက SQL Editor မှာ အောက်ပါ table များကို run ပြီး สร้างပါ။
+# Security
+JWT_SECRET_KEY="your-jwt-secret-for-admin-auth"
+JWT_ALGORITHM="HS256"
+JWT_EXPIRE_MINUTES=30
+```
 
-<details>
-<summary>Supabase SQL Schema (နှိပ်ပြီးကြည့်ပါ)</summary>
+### 4. Database Setup
 
-Generated sql
--- viber_users table (Viber မှ user များကို မှတ်ရန်)
+Execute in Supabase SQL Editor:
+
+```sql
+-- Users table for Viber bot interactions
 CREATE TABLE viber_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     viber_id TEXT NOT NULL UNIQUE,
     name TEXT,
     account_id TEXT UNIQUE,
     state TEXT DEFAULT 'AWAITING_ACCOUNT_ID',
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    balance NUMERIC DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- transactions table (ငွေသွင်း/ငွေထုတ် မှတ်တမ်း)
+-- Transaction records
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES viber_users(id),
-    type TEXT NOT NULL, -- 'deposit' or 'withdraw'
-    amount NUMERIC NOT NULL,
-    status TEXT DEFAULT 'pending', -- 'pending', 'completed', 'rejected'
+    user_id UUID REFERENCES viber_users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL CHECK (type IN ('deposit', 'withdraw')),
+    amount NUMERIC NOT NULL CHECK (amount > 0),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    description TEXT,
+    admin_notes TEXT,
+    approved_by UUID,
+    approved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- users table (Admin panel အတွက်)
+-- Admin users
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL,
-    role TEXT DEFAULT 'admin',
+    role TEXT DEFAULT 'admin' CHECK (role IN ('admin', 'super_admin')),
     is_active BOOLEAN DEFAULT TRUE,
     last_login TIMESTAMPTZ,
     login_count INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Admin user တစ်ယောက်ကို စမ်းသပ်ရန်အတွက် ထည့်သွင်းခြင်း
--- မှတ်ချက်: password ကို bcrypt ဖြင့် hash လုပ်ပြီးမှ ထည့်ရန်လိုအပ်ပါသည်။
--- Local မှာ python script တစ်ခုဖြင့် hash လုပ်ပြီးမှ Supabase မှာထည့်ပါ။
--- INSERT INTO users (email, password, role) VALUES ('admin@example.com', 'hashed_password_here', 'admin');
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-SQL
-IGNORE_WHEN_COPYING_END
+-- Create indexes for performance
+CREATE INDEX idx_viber_users_viber_id ON viber_users(viber_id);
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_status ON transactions(status);
+CREATE INDEX idx_transactions_created_at ON transactions(created_at);
+
+-- Create admin user (replace with hashed password)
+-- Use bcrypt to hash password before inserting
+-- INSERT INTO users (email, password, role) VALUES 
+-- ('admin@ygn-bot.com', '$2b$12$hashedpasswordhere', 'super_admin');
+```
+
+### 5. Create Admin User
+
+```python
+# create_admin.py
+import bcrypt
+from supabase import create_client
+
+# Hash password
+password = "your_secure_password"
+hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+# Insert to Supabase
+supabase = create_client("your_url", "your_key")
+result = supabase.table("users").insert({
+    "email": "admin@ygn-bot.com",
+    "password": hashed,
+    "role": "super_admin"
+}).execute()
+
+print("Admin user created successfully!")
+```
+
+### 6. Run Development Server
+
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Visit:
+- **API**: http://localhost:8000
+- **Docs**: http://localhost:8000/docs
+- **Admin**: http://localhost:8000/admin
+
+## 🐳 Docker Deployment
+
+### Build & Run
+
+```bash
+# Build image
+docker build -t ygn-bot-service .
+
+# Run container
+docker run -p 8000:8000 --env-file .env ygn-bot-service
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+    restart: unless-stopped
+```
+
+## ☁️ Production Deployment
+
+### Render.com (Recommended)
+
+1. **Create New Web Service**
+   - Connect GitHub repository
+   - Select `main` branch
+
+2. **Configure Build**
+   ```
+   Build Command: pip install -r requirements.txt
+   Start Command: gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT
+   ```
+
+3. **Set Environment Variables**
+   - Add all variables from `.env`
+   - Set `ENVIRONMENT=production`
+
+4. **Configure Viber Webhook**
+   ```
+   Webhook URL: https://your-app.onrender.com/viber-webhook
+   ```
+
+### Alternative Platforms
+
+<details>
+<summary>Railway</summary>
+
+```yaml
+# railway.json
+{
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
+```
 </details>
 
-၇။ Local Server ကို Run ပါ
-Generated bash
-uvicorn main:app --reload
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Bash
-IGNORE_WHEN_COPYING_END
+<details>
+<summary>Vercel</summary>
 
-Browser မှာ http://127.0.0.1:8000 ကိုသွားပြီး "🏠 YGN Bot Service" စာတန်းကိုမြင်ရရင် အောင်မြင်ပါတယ်။
+```json
+// vercel.json
+{
+  "builds": [
+    {
+      "src": "main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "main.py"
+    }
+  ]
+}
+```
+</details>
 
-Render.com တွင် Deploy ပြုလုပ်ခြင်း
+## 🔌 API Reference
 
-Render မှာ deploy ပြုလုပ်ရန် အလွန်လွယ်ကူပါတယ်။
+### Bot Endpoints
 
-အဆင့် ၁: New Web Service สร้างပါ
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Service status |
+| `GET` | `/health` | Health check |
+| `POST` | `/viber-webhook` | Viber webhook handler |
 
-Render Dashboard မှာ "New +" ကိုနှိပ်ပြီး "Web Service" ကိုရွေးပါ။
+### Admin Endpoints
 
-သင့် GitHub account ကိုချိတ်ဆက်ပြီး ဒီ project repository ကို ရွေးချယ်ပါ။
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/auth/login` | Admin login | ❌ |
+| `GET` | `/admin/analytics` | Dashboard analytics | ✅ |
+| `POST` | `/admin/approve-transaction` | Approve transaction | ✅ |
+| `GET` | `/admin/transactions` | List transactions | ✅ |
+| `PUT` | `/admin/transaction/{id}` | Update transaction | ✅ |
 
-အဆင့် ၂: Settings များကို ဖြည့်စွက်ပါ
+### Authentication
 
-Name: သင့် service အတွက် နာမည်တစ်ခုပေးပါ (ဥပမာ ygn-bot-service)။
+```bash
+# Login
+curl -X POST "https://your-app.com/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@example.com", "password": "password"}'
 
-Region: သင့်နဲ့အနီးဆုံး region ကိုရွေးပါ။
+# Use token
+curl -X GET "https://your-app.com/admin/analytics" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
 
-Branch: main (သို့) သင်အသုံးပြုလိုသော branch ကိုရွေးပါ။
+## 🔒 Security Features
 
-Root Directory: . (そのままထားပါ)
+- **Webhook Signature Verification**: Validates Viber requests
+- **JWT Authentication**: Secure admin access
+- **Rate Limiting**: Prevents abuse
+- **CORS Protection**: Configurable origins
+- **Input Validation**: Pydantic models
+- **SQL Injection Prevention**: Parameterized queries
 
-Runtime: Python 3
+## 🧪 Testing
 
-Build Command: pip install -r requirements.txt
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio httpx
 
-Start Command: gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
+# Run tests
+pytest tests/
 
-(သို့မဟုတ်) uvicorn main:app --host 0.0.0.0 --port $PORT
+# With coverage
+pytest --cov=app tests/
+```
 
-အဆင့် ၃: Environment Variables များကို ထည့်သွင်းပါ
+## 📊 Monitoring
 
-"Advanced" ကိုနှိပ်ပြီး "Add Environment Variable" ဖြင့် သင့် .env ဖိုင်ထဲက key တွေအားလုံးကို တစ်ခုချင်းစီ ထည့်သွင်းပါ။
+### Health Check
 
-Key: SUPABASE_URL, Value: https://...
+```bash
+curl https://your-app.com/health
+```
 
-Key: SUPABASE_KEY, Value: your-key...
+Response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "version": "1.0.0",
+  "database": "connected"
+}
+```
 
-Key: SUPABASE_JWT_SECRET, Value: your-jwt-secret...
+### Logs
 
-Key: VIBER_TOKEN, Value: your-viber-token...
+```bash
+# View application logs
+tail -f logs/app.log
 
-Key: VIBER_WEBHOOK_SECRET, Value: your-secret-string...
+# Docker logs
+docker logs -f container_name
+```
 
-Key: ENVIRONMENT, Value: production
+## 🤝 Contributing
 
-အဆင့် ၄: Deploy ပြုလုပ်ပါ
+1. **Fork** the repository
+2. **Create** feature branch: `git checkout -b feature/amazing-feature`
+3. **Commit** changes: `git commit -m 'Add amazing feature'`
+4. **Push** to branch: `git push origin feature/amazing-feature`
+5. **Open** Pull Request
 
-"Create Web Service" ကိုနှိပ်ပြီး deploy process ကိုစောင့်ပါ။
+### Development Setup
 
-Deploy ပြီးသွားရင် Render က သင့် service အတွက် public URL တစ်ခုပေးပါလိမ့်မယ်။ (ဥပမာ https://ygn-bot-service.onrender.com)
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
 
-အဆင့် ၅: Viber Webhook ကို Set လုပ်ပါ
+# Install pre-commit hooks
+pre-commit install
 
-သင်၏ Viber Admin Panel ကိုသွားပါ။
+# Run linting
+black .
+flake8 .
+isort .
+```
 
-"Webhook URL" နေရာမှာ Render ကပေးတဲ့ URL နောက်မှာ /viber-webhook ကိုထည့်ပေးပါ။
+## 📄 License
 
-ဥပမာ: https://ygn-bot-service.onrender.com/viber-webhook
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Event Types တွေအားလုံးကို အမှန်ခြစ်ပေးပြီး Save လုပ်ပါ။
+## 🆘 Support
 
-ယခုဆိုလျှင် သင်၏ Viber bot သည် Render server ပေါ်တွင် အလုပ်လုပ်နေပြီဖြစ်ပါသည်။
+- **Issues**: [GitHub Issues](https://github.com/EthanVT97/bayin-backend/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/EthanVT97/bayin-backend/discussions)
+- **Email**: support@ygn-bot.com
 
-API Endpoints
+## 🙏 Acknowledgments
 
-GET /: Root endpoint.
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [Supabase](https://supabase.com/) - Open source Firebase alternative
+- [Viber](https://developers.viber.com/) - Messaging platform API
 
-GET /docs: FastAPI Swagger UI (API Documentation).
+---
 
-GET /health: Service health check.
-
-POST /viber-webhook: Viber မှ data လက်ခံမည့် အဓိက endpoint။
-
-POST /auth/login: Admin များအတွက် login endpoint။
-
-GET /admin/analytics: Admin များအတွက် analytics data ကြည့်ရန်။
-
-POST /admin/approve-transaction: Admin များအတွက် transaction ကို approve လုပ်ရန်။
-
-GET /admin: Admin panel frontend (static files)။
+**Built with ❤️ in Myanmar** 🇲🇲
