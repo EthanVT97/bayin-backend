@@ -761,7 +761,7 @@ async def handle_main_menu_input(client: httpx.AsyncClient, user_id: str, text: 
     except Exception as e:
         logger.error(f"Failed to handle main menu input for {user_id}: {e}")
         await send_viber_message(client, user_id, "An error occurred. Please try again.")
-
+        
 async def handle_balance_check(client: httpx.AsyncClient, user: Dict[str, Any]):
     """Calculates and sends the user's approved balance."""
     user_id = user["viber_id"]
@@ -778,3 +778,91 @@ async def handle_balance_check(client: httpx.AsyncClient, user: Dict[str, Any]):
                     .execute()
                 ),
                 timeout=10.0
+            )
+        except Exception as e:
+            logger.error(f"Failed to reset state for {user_id}: {e}")
+        return
+
+    try:
+        res = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: supabase.table("transactions")
+                .select("amount")
+                .eq("account_id", account_id)
+                .eq("status", "approved")
+                .execute()
+            ),
+            timeout=10.0
+        )
+        txs = res.data if res and res.data else []
+        balance = sum(tx.get("amount", 0) if tx.get("type") == "deposit" else -tx.get("amount", 0) for tx in txs)
+        await send_viber_message(client, user_id, f"Your current balance is: {balance:.2f}")
+    except Exception as e:
+        logger.error(f"Failed to check balance for {user_id}: {e}")
+        await send_viber_message(client, user_id, "Unable to retrieve your balance. Please try again later.")
+
+# -------------------- Transaction Creation (Deposit / Withdraw) --------------------
+
+class TransactionCreateRequest(BaseModel):
+    account_id: str
+    amount: float
+
+@app.post("/transaction/deposit-request")
+async def create_deposit(
+    payload: TransactionCreateRequest,
+    current_admin: Dict[str, Any] = Depends(get_current_admin)
+):
+    return await create_transaction("deposit", payload, current_admin["sub"])
+
+@app.post("/transaction/withdraw-request")
+async def create_withdraw(
+    payload: TransactionCreateRequest,
+    current_admin: Dict[str, Any] = Depends(get_current_admin)
+):
+    return await create_transaction("withdraw", payload, current_admin["sub"])
+
+async def create_transaction(tx_type: str, payload: TransactionCreateRequest, admin_email: str):
+    if not payload.account_id or payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Invalid account_id or amount")
+    
+    tx_data = {
+        "account_id": payload.account_id,
+        "type": tx_type,
+        "amount": payload.amount,
+        "status": "pending",
+        "created_by": admin_email
+    }
+    try:
+        res = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: supabase.table("transactions").insert(tx_data).execute()
+            ),
+            timeout=10.0
+        )
+        tx_id = res.data[0]["id"] if res and res.data else None
+        logger.info(f"{tx_type.capitalize()} request created by {admin_email}: {tx_data}")
+        return {"status": "created", "tx_id": tx_id, "details": tx_data}
+    except Exception as e:
+        logger.error(f"Failed to create {tx_type} transaction: {e}")
+        raise HTTPException(status_code=500, detail="Transaction creation failed")
+
+# -------------------- Webhook Event Logging --------------------
+
+# This code block goes inside /viber-webhook route (already patched above)
+# Insert after `event_type = ...` and `user_id = ...`
+
+# Log event into viber_events
+try:
+    await asyncio.wait_for(
+        asyncio.to_thread(
+            lambda: supabase.table("viber_events").insert({
+                "event_type": event_type,
+                "raw_payload": data,
+                "user_id": user_id
+            }).execute()
+        ),
+        timeout=10.0
+    )
+except Exception as e:
+    logger.error(f"Failed to log Viber event {event_type}: {e}")
+        
